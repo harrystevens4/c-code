@@ -1,0 +1,16 @@
+.\" Manpage for prng
+.TH man 8 "11 June 2024" "1.0" "prng man page"
+.SH NAME
+prng \- generate random number
+.SH SYNOPSIS
+prng generates a number between 0 and 255
+.SH DESCRIPTION
+prng is a small tool that emulates a pseudo-random number generator, utilising the current time to create a seed and generate a random number between 0 and 225.
+.SH OPTIONS
+The prng command does not take any options
+.SH SEE ALSO
+Nothing currently. 
+.SH BUGS
+No known bugs.
+.SH AUTHOR
+harry
