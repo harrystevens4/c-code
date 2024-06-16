@@ -1,0 +1,16 @@
+.\" Manpage for prng
+.TH man 8 "16 June 2024" "1.0" "remove-substring man page"
+.SH NAME
+remove-substring
+.SH SYNOPSIS
+remove substring from within a string
+.SH DESCRIPTION
+removes the last occurence of a substring within a string
+.SH OPTIONS
+use 'remove-substring "<string>" "<substring>"'
+.SH SEE ALSO
+Nothing currently. 
+.SH BUGS
+No known bugs.
+.SH AUTHOR
+rufus173
