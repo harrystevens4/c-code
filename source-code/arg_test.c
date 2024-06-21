@@ -14,5 +14,8 @@ int main(int argc, char *argv[]){
 	for (int i = 0;i<arguments.number_multi;i++){
 		printf("long:%s\n",arguments.multi[i]);
 	}
+	for (int i=0;i<arguments.number_other;i++){
+		printf("other:%s\n",arguments.other[i]);
+	}
 	return 0;
 }
