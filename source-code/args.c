@@ -37,3 +37,11 @@ void parse_args(int argc, char *argv[], struct args *arguments){
 	arguments->number_multi = multi_count;
 	arguments->number_other = other_count;
 }
+void free_args(struct args *arguments){
+	if (arguments->number_other != 0){
+                for (int i=0;i<arguments->number_other;i++){
+                        free(arguments->other[i]);
+                }
+        }
+        free(arguments->other);
+}
