@@ -1,0 +1,16 @@
+.\" Manpage for truncate
+.TH man 8 "25 June 2024" "1.0" "remove-substring man page"
+.SH NAME
+truncate
+.SH SYNOPSIS
+removes a number of characters from the end of a string
+.SH DESCRIPTION
+uses a number passed to remove that amount of characters from the end of a provided string, and output the result to stdout.
+.SH OPTIONS
+use 'trucnate <number of characters> "<string>"'
+.SH SEE ALSO
+Nothing currently. 
+.SH BUGS
+No known bugs.
+.SH AUTHOR
+rufus173
