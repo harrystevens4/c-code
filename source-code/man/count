@@ -1,0 +1,17 @@
+.\" Manpage for count
+.TH man 8 "25 June 2024" "1.0" "count man-page"
+.SH NAME
+count
+.SH SYNOPSIS
+counts characters and words
+.SH DESCRIPTION
+counts the number of characters provided or words within a string
+.SH OPTIONS
+	count <string> : counts the letters in said string. note: does not have to be in quotation marks, as the spaces between the arguments are added to the total character count.
+	count -w "<string>" : counts the words (number of spaces +1) in the string. must be encapsulated in quotation marks.
+.SH SEE ALSO
+Nothing currently. 
+.SH BUGS
+No known bugs.
+.SH AUTHOR
+rufus173
