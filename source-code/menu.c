@@ -1,15 +1,22 @@
+#include <ncurses.h> //compile with -lncurses at the end
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <stdlib.h>
-#include "args.h"
+#include "args.h"//compile with args.c
 
 char* repeat_char(char character,int number);
 
 int main(int argc, char *argv[]){
+	//initscr();
+	
 	struct args arguments;
 	parse_args(argc,argv,&arguments);
+	if (arguments.number_other <= 2){
+		fprintf(stderr,"not enough arguments\n");
+		return 1;
+	}
 	struct winsize terminal;
 	ioctl(1,TIOCGWINSZ, &terminal);
 	int width = terminal.ws_col;
@@ -24,7 +31,8 @@ int main(int argc, char *argv[]){
 	int bpad_num;
 	int lpad_num;
 	int rpad_num;
-	int option_width //the actual width of the options being displayed within the window
+	int option_width; //the actual width of the options being displayed within the window
+	int prompt_width;
 	int win_height;
 	int win_width=12;//minimum width of ║ :::  ::: ║
 	for (int i=0;i<arguments.number_other;i++){
@@ -55,19 +63,10 @@ int main(int argc, char *argv[]){
 	prompt_width = (win_width-12);
 	prompt = malloc(sizeof(char)*(prompt_width+1));
 	strcpy(prompt,arguments.other[0]); //first other arg is the prompt
-	for (int i=0;i<prompt_width){
-	
-
-
-
-
-		//continue here
-
-
-
-
-
+	for (int i=strlen(arguments.other[0]);i<prompt_width;i++){
+		prompt[i] = ' ';
 	}
+	prompt[prompt_width] = '\0';
 
 	//base = malloc((sizeof(char)*(win_width-2))+1);
 //	for (int i = 0;i<win_width-2;i++){
@@ -89,6 +88,7 @@ int main(int argc, char *argv[]){
 	printf("win_height:%d\ntpad_num:%d\nbpad_num:%d\nwidth:%d\n",win_height,tpad_num,bpad_num,win_width);
 
 	while(1){
+		refresh();
 		printf("\033[104;97m");
 		for (int i=0;i<tpad_num;i++){//print the top padding
 			printf("%s",empty_row);
@@ -99,14 +99,39 @@ int main(int argc, char *argv[]){
 		}
 		printf("╗%s\n",rpad);//right corner and r pad
 		printf("%s║ ::: %s ::: ║%s\n",lpad,prompt,rpad); //second line
-		break;
+		printf("%s╠",lpad); //mid section seperator left corner
+		for (int i=0;i<win_width-2;i++){
+			printf("═");//mid line mid section
+		}
+		printf("╣%s\n",rpad);// end of mid section
+		//code for the selection boxes
+		for (int i = 1;i<arguments.number_other;i++){
+			if ((i-1) != selected){
+				printf("%s║ ( ) %s",lpad,arguments.other[i]); // non selected options
+			}else{
+				printf("%s║\033[101;97m (*) %s",lpad,arguments.other[i]); // non selected options
+			}
+			for (int j=0;j<(win_width-12-strlen(arguments.other[i]));j++){
+				printf(" ");//padding out the extra space after the text
+			}
+			printf("     \033[104;97m║%s\n",rpad);
+		}
+		printf("%s╚",lpad);
+		for (int i=0;i<win_width-2;i++){
+			printf("═");
+		}
+		printf("╝%s\n",rpad);
+		for (int i=0;i<bpad_num-1;i++){printf("%s\n",empty_row);}
+		getch(); //arrow key detection
+		//break;
 	}
+	//endwin();
 
 	free(empty_row);
 	//free(base);
 	free(lpad);
 	free(prompt);
-	//free(rpad);
+	free(rpad);
 	free_args(&arguments);// frees the massive 2d array holding the other arguments
 	return selected; //return the index of the selected option
 }
