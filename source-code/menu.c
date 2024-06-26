@@ -1,4 +1,5 @@
 #include <ncurses.h> //compile with -lncurses at the end
+#include <termios.h>
 #include <stdio.h>
 #include <string.h>
 #include <unistd.h>
@@ -10,7 +11,9 @@ char* repeat_char(char character,int number);
 
 int main(int argc, char *argv[]){
 	//initscr();
-	
+	keypad(stdscr, TRUE);	
+	cbreak();
+
 	struct args arguments;
 	parse_args(argc,argv,&arguments);
 	if (arguments.number_other <= 2){
@@ -85,7 +88,8 @@ int main(int argc, char *argv[]){
 	win_height = arguments.number_other+4;
 	tpad_num = (height/2)-(int)(win_height/2);// measure half then remove half the height of the window to indent it
 	bpad_num = height-(tpad_num+win_height);// subtract the remaining space to get the bpad
-	printf("win_height:%d\ntpad_num:%d\nbpad_num:%d\nwidth:%d\n",win_height,tpad_num,bpad_num,win_width);
+	//printf("win_height:%d\ntpad_num:%d\nbpad_num:%d\nwidth:%d\n",win_height,tpad_num,bpad_num,win_width);
+
 
 	while(1){
 		refresh();
@@ -121,9 +125,17 @@ int main(int argc, char *argv[]){
 			printf("═");
 		}
 		printf("╝%s\n",rpad);
-		for (int i=0;i<bpad_num-1;i++){printf("%s\n",empty_row);}
-		getch(); //arrow key detection
-		//break;
+		for (int i=0;i<bpad_num;i++){printf("%s\n",empty_row);}
+		//while (1){
+		//char ch;
+		//ch = getch(); //arrow key detection
+		//if (ch=='\033'){
+		//	printf("arrow\n");
+		//	ch=-1;
+		//}
+		//}
+		break;
+		
 	}
 	//endwin();
 
