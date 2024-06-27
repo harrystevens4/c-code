@@ -1,4 +1,5 @@
-#include <ncurses.h> //compile with -lncurses at the end
+#include <ncurses.h> //compile with -lncursesw at the end
+#include <locale.h>
 #include <termios.h>
 #include <stdio.h>
 #include <string.h>
@@ -10,10 +11,7 @@
 char* repeat_char(char character,int number);
 
 int main(int argc, char *argv[]){
-	//initscr();
-	keypad(stdscr, TRUE);	
-	cbreak();
-
+	setlocale(LC_ALL,"");//necesary for unicode characters to display properly
 	struct args arguments;
 	parse_args(argc,argv,&arguments);
 	if (arguments.number_other <= 2){
@@ -29,12 +27,12 @@ int main(int argc, char *argv[]){
 	char *lpad;
 	char *rpad;
 	char *prompt;
-	char *base;// these characters that make up the top and bottom: ══════════
+	//char *base;// these characters that make up the top and bottom: ══════════
 	int tpad_num;
 	int bpad_num;
 	int lpad_num;
 	int rpad_num;
-	int option_width; //the actual width of the options being displayed within the window
+	//int option_width; //the actual width of the options being displayed within the window
 	int prompt_width;
 	int win_height;
 	int win_width=12;//minimum width of ║ :::  ::: ║
@@ -90,60 +88,83 @@ int main(int argc, char *argv[]){
 	bpad_num = height-(tpad_num+win_height);// subtract the remaining space to get the bpad
 	//printf("win_height:%d\ntpad_num:%d\nbpad_num:%d\nwidth:%d\n",win_height,tpad_num,bpad_num,win_width);
 
+	initscr();
+	cbreak();
+	keypad(stdscr, TRUE);	
+	noecho();
+	start_color();
+	init_pair(0,COLOR_WHITE,COLOR_CYAN);//everything else (grey background for some reason)
+	init_pair(1,COLOR_WHITE,COLOR_RED);//selected choice
+	int ch;
+	attron(COLOR_PAIR(0));
 
-	while(1){
-		refresh();
-		printf("\033[104;97m");
-		for (int i=0;i<tpad_num;i++){//print the top padding
-			printf("%s",empty_row);
-		}
-		printf("%s╔",lpad);//l pad and corner
+	int cycle = 0;
+	for (;;){
+		clear();
+		//if (cycle>=8){break;}
+		//printf("\033[104;97m");
+		cycle++;
+		for (int i=0;i<tpad_num;i++){printw("%s",empty_row);}
+		printw("%s╔",lpad);//l pad and corner
 		for (int i=0;i<win_width-2;i++){
-			printf("═");//top line mid section
+			printw("═");//top line mid section
 		}
-		printf("╗%s\n",rpad);//right corner and r pad
-		printf("%s║ ::: %s ::: ║%s\n",lpad,prompt,rpad); //second line
-		printf("%s╠",lpad); //mid section seperator left corner
+		printw("╗%s",rpad);//right corner and r pad
+		printw("%s║ ::: %s ::: ║%s",lpad,prompt,rpad); //second line
+		printw("%s╠",lpad); //mid section seperator left corner
 		for (int i=0;i<win_width-2;i++){
-			printf("═");//mid line mid section
+			printw("═");//mid line mid section
 		}
-		printf("╣%s\n",rpad);// end of mid section
+		printw("╣%s",rpad);// end of mid section
 		//code for the selection boxes
 		for (int i = 1;i<arguments.number_other;i++){
+			printw("%s║",lpad);
 			if ((i-1) != selected){
-				printf("%s║ ( ) %s",lpad,arguments.other[i]); // non selected options
+				printw(" ( ) %s",arguments.other[i]); // non selected options
 			}else{
-				printf("%s║\033[101;97m (*) %s",lpad,arguments.other[i]); // non selected options
+				attroff(COLOR_PAIR(0));
+				attron(COLOR_PAIR(1));
+				printw(" (*) %s",arguments.other[i]); // non selected options
 			}
 			for (int j=0;j<(win_width-12-strlen(arguments.other[i]));j++){
-				printf(" ");//padding out the extra space after the text
+				printw(" ");//padding out the extra space after the text
 			}
-			printf("     \033[104;97m║%s\n",rpad);
-		}
-		printf("%s╚",lpad);
-		for (int i=0;i<win_width-2;i++){
-			printf("═");
-		}
-		printf("╝%s\n",rpad);
-		for (int i=0;i<bpad_num;i++){printf("%s\n",empty_row);}
-		//while (1){
-		//char ch;
-		//ch = getch(); //arrow key detection
-		//if (ch=='\033'){
-		//	printf("arrow\n");
-		//	ch=-1;
-		//}
-		//}
-		break;
-		
-	}
-	//endwin();
+			printw("     ");
+			attroff(COLOR_PAIR(1));
 
+			attron(COLOR_PAIR(0));
+			printw("║%s",rpad);
+		}
+		printw("%s╚",lpad);
+		for (int i=0;i<win_width-2;i++){
+			printw("═");
+		}
+		printw("╝%s\n",rpad);
+		refresh();
+		for (int i=0;i<bpad_num;i++){printw("%s\n",empty_row);} //bottom padding
+		ch = getch();
+		if (ch == KEY_UP){
+			if (selected != 0){
+				selected--;
+			}
+		}
+		if (ch == KEY_DOWN){
+			if (selected !=arguments.number_other-2){
+				selected++;
+			}
+		}
+		if(ch == 10){//enter key
+			refresh();
+			break;
+		}
+	}
+	
+	endwin();
 	free(empty_row);
 	//free(base);
 	free(lpad);
 	free(prompt);
 	free(rpad);
 	free_args(&arguments);// frees the massive 2d array holding the other arguments
-	return selected; //return the index of the selected option
+	return selected; //exit with code of the index of the selected option
 }

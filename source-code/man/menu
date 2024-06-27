@@ -1,0 +1,17 @@
+.\" Manpage for menu
+.TH man 8 "27 June 2024" "2.0" "menu man page"
+.SH NAME
+menu
+.SH SYNOPSIS
+TUI menu aplication
+.SH DESCRIPTION
+provides a menu with a header and as meny options as provided for the user to navigate and pick from.
+a header must be provided and at least 2 options. returns the index of the option as an exit staus. (indexed from 0). this means thatif the user selected option 5, it would exit with status 4.
+.SH OPTIONS
+menu "<header>" "<option 1>".."<option n>"
+.SH SEE ALSO
+Nothing currently. 
+.SH BUGS
+No known bugs.
+.SH AUTHOR
+rufus173
