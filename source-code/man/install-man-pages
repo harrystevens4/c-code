@@ -1,0 +1,16 @@
+#!/bin/bash
+if [ "$EUID" -ne 0 ]; then
+	echo "please execute as root"
+	exit
+fi
+if ! [ -d /usr/share/man/man1 ]; then
+	echo "could not find man directory."
+fi
+for file in $(ls | grep ".1") #only the man pages should end in .1
+do
+	echo "copying $file"
+	cp $file /usr/share/man/man1
+	echo "done"
+done
+echo "finnished sucsessfully"
+exit 0
