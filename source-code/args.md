@@ -20,7 +20,7 @@ The struct `args` contais 6 variables.
 ## Making use of the arguments
 
 Now you have initialised it, you can acces the info from within the `args` struct.
-> example on how to use this effectively
+- example on how to use this effectively
 	#include "args.h"
 	#include <stdio.h>
 	int main(int argc, char *argv[]){
