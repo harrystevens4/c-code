@@ -38,6 +38,13 @@ int main(int argc, char* argv[]){
 						}
 					}
 				}
+			case 'n'://remove all newlines
+				for (int line=0;line<lines.line_count;line++){
+					if (lines.lines[line][lines.line_length[line]-1]=='\n'){
+						lines.lines[line][lines.line_length[line]-1] = '\0';//set newline to null to terminate the string
+					}
+				}
+
 		}
 	}
 	/* output */
