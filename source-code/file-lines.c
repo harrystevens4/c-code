@@ -27,18 +27,16 @@ void get_lines(struct lines *lines,FILE* doc){
 			}
 		}
 		if (done){
-			printf("finnished reading document\n");
 			break;
 		}
 		line[line_length] = '\0';	
 		lines->line_length = realloc(lines->line_length,sizeof(int)*(line_count+1));
-		lines->line_length[line_count] = line_length-1; //not coiunting null byte
+		lines->line_length[line_count] = line_length;
 		line_count++;
 		lines->lines = realloc(lines->lines,sizeof(char*)*line_count);
 		lines->lines[line_count-1] = realloc(lines->lines[line_count-1],sizeof(char)*(line_length+1));
 		strcpy(lines->lines[line_count-1],line);
 		line_length = 0;
-		printf("%s",line);
 
 	}
 	lines->line_count = line_count;
