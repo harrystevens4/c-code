@@ -17,6 +17,10 @@ void free_buffer(struct buffer *buffer){
 
 void free_locks(struct locks *locks){
 	free(locks->lock);
+	for (int i=0;i<locks->number_of_locks;i++){
+		free(locks->lock_name[i]);
+	}
+	free(locks->lock_name);
 }
 
 int make_named_socket (const char *filename){
