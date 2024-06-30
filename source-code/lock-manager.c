@@ -1,7 +1,9 @@
 #include "daemon-core.h"
 #include "args.h"
 #include <stdlib.h>
+#include <stdint.h>
 #include <errno.h>
+#include <arpa/inet.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
@@ -102,12 +104,12 @@ int start_daemon(){
 		}
 		name[i] = '\0';
 		printf("received name of %s\n",name);
-		close(data_socket);
 		//break;
 		/* command processing */
 		if (!strncmp(command,kill,4)){ //kill the daemon
 			break;
 		}
+		lock_status = 0;
 		if (!strncmp(command,"acquire",7)){
 			printf("checking lock status of lock named %s\n",name);
 			for (int i=0;i<locks.number_of_locks;i++){
@@ -128,12 +130,18 @@ int start_daemon(){
 				lock_status = 1;
 			}
 		}
-		printf("sending return status of %d\n",lock_status);
-		write(data_socket,buffer,BUFFER_SIZE);
+		sprintf(buffer,"%d",lock_status);
+		printf("sending return status of %s\n",buffer);
+		result = write(data_socket,buffer,BUFFER_SIZE);
+		if (result<0){
+			perror("write");
+			exit(EXIT_FAILURE);
+		}
 	}
 	/* cleanup */
 	printf("cleaning up\n");
 	close(server);
+	close(data_socket);
 	remove(SERVER_FD);
 	free(name);
 	//exit(EXIT_SUCCESS);
@@ -141,6 +149,7 @@ int start_daemon(){
 }
 int acquire_lock(char *lock_name){
 	char buffer[BUFFER_SIZE];
+	int return_status = 2;
 	int result;
 	int data_socket;
 	printf("attempting to aquire lock of name %s\n",lock_name);
@@ -177,8 +186,14 @@ int acquire_lock(char *lock_name){
 		perror("write");
 		exit(EXIT_FAILURE);
 	}
-	read(data_socket,buffer,BUFFER_SIZE);
-	int return_status = buffer[0];
+	for (;;){ //loop untill we receive an int and not "END"
+		read(data_socket,buffer,BUFFER_SIZE);
+		printf("got buffer for status %s\n",buffer);
+		if (strncmp(buffer,"END",3)){
+			break;
+		}
+	}
+	return_status = atoi(buffer);
 	printf("returned with status %d\n",return_status);
 
 	/* clean up */
