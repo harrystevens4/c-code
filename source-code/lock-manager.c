@@ -20,6 +20,7 @@ int main(int argc, char *argv[]){
 	struct args arguments;
 	parse_args(argc,argv,&arguments);
 	for (int single=0;single<arguments.number_single;single++){
+		printf("proccessing arg %c\n",arguments.single[single]);
 		switch (arguments.single[single]){
 			case 's': //start daemon
 				printf("starting daemon\n");
@@ -30,14 +31,17 @@ int main(int argc, char *argv[]){
 					printf("server terminated with no errors\n");
 					return 0;
 				}
+				break;
 			case 'a': //aquire lock
 				 if (arguments.number_other<1){
 					 fprintf(stderr,"name not specified\n");
 					 return 1;
 				 }
 				 acquire_lock(arguments.other[0]);
+				 break;
 			case 'k': //kill daemon
 				  kill_daemon();
+				  break;
 		}
 	}
 
@@ -47,6 +51,11 @@ int main(int argc, char *argv[]){
 	return 0;
 }
 int start_daemon(){
+	/* locks */
+	struct locks locks;
+	locks.lock_name = malloc(sizeof(char*));
+	locks.number_of_locks = 0;
+	int lock_status; //0 for available 1 for unavailable
 	/* socket */
 	int server = make_named_socket(SERVER_FD);
 	int data_socket;
@@ -95,9 +104,32 @@ int start_daemon(){
 		printf("received name of %s\n",name);
 		close(data_socket);
 		//break;
-		if (!strncmp(command,kill,4)){
+		/* command processing */
+		if (!strncmp(command,kill,4)){ //kill the daemon
 			break;
 		}
+		if (!strncmp(command,"acquire",7)){
+			printf("checking lock status of lock named %s\n",name);
+			for (int i=0;i<locks.number_of_locks;i++){
+				if(!strncmp(locks.lock_name[i],name,strlen(name))){
+					lock_status = 1;
+				}
+			}
+			if (!(lock_status)){
+				printf("lock available\n");
+				locks.number_of_locks++;
+				locks.lock_name = realloc(locks.lock_name,sizeof(char*)*locks.number_of_locks);
+				locks.lock_name[locks.number_of_locks-1] = malloc(sizeof(char)*(strlen(name)+1));
+				strcpy(locks.lock_name[locks.number_of_locks-1],name);
+				printf("lock created\n");
+				lock_status = 0;
+			}else{
+				printf("lock unavailable\n");
+				lock_status = 1;
+			}
+		}
+		printf("sending return status of %d\n",lock_status);
+		write(data_socket,buffer,BUFFER_SIZE);
 	}
 	/* cleanup */
 	printf("cleaning up\n");
@@ -115,7 +147,7 @@ int acquire_lock(char *lock_name){
 	/* connect to server */
 	data_socket = connect_named_socket(SERVER_FD);
 	/* let the daemon know we want to aquire a lock */
-	sprintf(buffer,"aquire");
+	sprintf(buffer,"acquire");
 	result = write(data_socket,buffer,BUFFER_SIZE);
 	if (result<0){
 		perror("write");
@@ -145,7 +177,12 @@ int acquire_lock(char *lock_name){
 		perror("write");
 		exit(EXIT_FAILURE);
 	}
+	read(data_socket,buffer,BUFFER_SIZE);
+	int return_status = buffer[0];
+	printf("returned with status %d\n",return_status);
 
+	/* clean up */
+	printf("cleaning up\n");
 	close(data_socket);
 	return 0;
 }
@@ -188,6 +225,6 @@ void kill_daemon(){
 		perror("write");
 		exit(EXIT_FAILURE);
 	}
-
+	printf("cleaning up\n");
 	close(data_socket);
 }
