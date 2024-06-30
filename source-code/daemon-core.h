@@ -6,6 +6,8 @@ struct buffer{
 	char **buffer; //for storing the buffer of commands to be processed by the daemon
 };
 struct locks{
+	int number_of_locks;
+	char **lock_name; //aray of strings for named locks
 	int * lock; //an array for locks (0 for unlocked, 1 for locked)
 };
 
