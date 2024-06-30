@@ -9,4 +9,5 @@ struct args{
 	char **other;
 };
 void parse_args(int argc, char *argv[],struct args *arguments);
+void free_args(struct args *arguments);
 #endif
