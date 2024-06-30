@@ -13,6 +13,7 @@
 #define BUFFER_SIZE 12
 int start_daemon();
 int acquire_lock(char *lock_name);
+void kill_daemon();
 int main(int argc, char *argv[]){
 	/* initialisation */
 	int result;
@@ -35,6 +36,8 @@ int main(int argc, char *argv[]){
 					 return 1;
 				 }
 				 acquire_lock(arguments.other[0]);
+			case 'k': //kill daemon
+				  kill_daemon();
 		}
 	}
 
@@ -47,6 +50,7 @@ int start_daemon(){
 	/* socket */
 	int server = make_named_socket(SERVER_FD);
 	int data_socket;
+	char kill[] = "kill";
 	char command[BUFFER_SIZE];
 	int result; //stores return values
 	char buffer[BUFFER_SIZE];
@@ -73,7 +77,7 @@ int start_daemon(){
 			exit(EXIT_FAILURE);
 		}
 		strcpy(command,buffer);
-		printf("%s\n",command);
+		printf("received command of %s\n",command);
 		write(data_socket,confirm,7);
 		int i = 0;
 		for (;;){
@@ -90,7 +94,10 @@ int start_daemon(){
 		name[i] = '\0';
 		printf("received name of %s\n",name);
 		close(data_socket);
-		break;
+		//break;
+		if (!strncmp(command,kill,4)){
+			break;
+		}
 	}
 	/* cleanup */
 	printf("cleaning up\n");
@@ -141,4 +148,46 @@ int acquire_lock(char *lock_name){
 
 	close(data_socket);
 	return 0;
+}
+void kill_daemon(){
+	char buffer[BUFFER_SIZE];
+	int result;
+	int data_socket;
+	char lock_name[] = "die";
+	printf("sending kill signal\n");
+	/* connect to server */
+	data_socket = connect_named_socket(SERVER_FD);
+	/* let the daemon know we want to aquire a lock */
+	sprintf(buffer,"kill");
+	result = write(data_socket,buffer,BUFFER_SIZE);
+	if (result<0){
+		perror("write");
+		exit(EXIT_FAILURE);
+	}
+	result = read(data_socket,buffer,BUFFER_SIZE);//confirmation of receive
+	/* transmit the name of the lock */
+	for (int i=0;i<strlen(lock_name);i++){
+		printf("sending %c\n",lock_name[i]);
+		buffer[0] = lock_name[i];
+		result = write(data_socket,buffer,BUFFER_SIZE);
+		if (result<0){
+			perror("write");
+			exit(EXIT_FAILURE);
+		}
+		result = read(data_socket,buffer,BUFFER_SIZE);//confirmation of receive
+		if (result<0){
+			perror("write");
+			exit(EXIT_FAILURE);
+		}
+	}
+	printf("transmiting end of transmition\n");
+	sprintf(buffer,"END");//end of transmition signal
+	result = write(data_socket,buffer,BUFFER_SIZE);
+
+	if (result<0){
+		perror("write");
+		exit(EXIT_FAILURE);
+	}
+
+	close(data_socket);
 }
