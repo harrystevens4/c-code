@@ -95,6 +95,11 @@ int start_daemon(){
 	int lock_status; //0 for available 1 for unavailable
 	/* socket */
 	int server = make_named_socket(SERVER_FD);
+	if (system("sudo chmod 777 /tmp/lock_manager_server.sock")){
+		printf("successfully made socket writable for all users\n");
+	}else{
+		printf("could not make socket writable for all users\n");
+	}
 	int data_socket;
 	char kill[] = "kill";
 	char command[BUFFER_SIZE];
