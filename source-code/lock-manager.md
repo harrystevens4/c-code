@@ -42,3 +42,13 @@ When removing a lock, the daemon will replace the index of the stored lock with 
 	final layout:
 
 	lock 1 | lock 4 | lock 3
+
+### daemon communication
+
+The terminal commands communicate with the daemon through a unix file socket located in `/tmp/lock_manager_server.sock`.  
+the command will send requests to the daemon in this order:
+1. Send the command verb. This is kill, acquire, release or query.
+2. Await confirmation from the daemon that is is ready for the name
+3. Send the lock name one `char` at a time.
+4. Send `END` signaling end of transmition
+5. Receive the command status. 1 or 0
