@@ -7,7 +7,8 @@ int main(int argc, char* argv[]){
 		return 1;
 	}
 	printf("arg1:%s\n",argv[1]);
-	int *truncate_amount = malloc(sizeof(int));//these are all pointers so i could learn how to use them. sorry it is not very efficient.
+	int *truncate_amount;
+	truncate_amount = malloc(sizeof(int));//these are all pointers so i could learn how to use them. sorry it is not very efficient.
 	*truncate_amount = atoi(argv[1]);
 	int *total_length = malloc(sizeof(int));
 	*total_length = strlen(argv[2]);
