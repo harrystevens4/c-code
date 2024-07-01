@@ -135,12 +135,16 @@ int start_daemon(){
 		}
 		lock_status = 0;
 		if (!strncmp(command,"acquire",7)){
-			printf("checking lock status of lock named %s\n",name);
+			printf("checking locks for a match to %s...\n",name);
 			for (int i=0;i<locks.number_of_locks;i++){
-				if(!strncmp(locks.lock_name[i],name,strlen(name))){
+				printf("\n%s",locks.lock_name[i]);
+				if(!strncmp(locks.lock_name[i],name,strlen(name)+1)){
 					lock_status = 1;
+					printf(" - match\n");
+					break;
 				}
 			}
+			printf("\n\n");
 			if (!(lock_status)){
 				printf("lock available\n");
 				locks.number_of_locks++;
