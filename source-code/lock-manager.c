@@ -16,6 +16,7 @@
 int start_daemon();
 int acquire_lock(char *lock_name);
 int query_lock(char *lock_name);
+int release_lock(char *lock_name);
 void kill_daemon();
 int main(int argc, char *argv[]){
 	/* initialisation */
@@ -63,6 +64,20 @@ int main(int argc, char *argv[]){
 				  }
 				  return result;
 				  break;
+			case 'r':
+				  if (arguments.number_other<1){
+					fprintf(stderr,"name not specified\n");
+					return 1;
+				  }
+				  result = release_lock(arguments.other[0]);
+				  if (result){//returns 1 if taken and 0 if free
+					  printf("lock could not be release\n");
+				  }else{
+					  printf("successful lock release\n");
+				  }
+				  return result;
+				  break;
+
 		}
 	}
 
@@ -76,6 +91,7 @@ int start_daemon(){
 	struct locks locks;
 	locks.lock_name = malloc(sizeof(char*));
 	locks.number_of_locks = 0;
+	int lock_index;
 	int lock_status; //0 for available 1 for unavailable
 	/* socket */
 	int server = make_named_socket(SERVER_FD);
@@ -175,6 +191,32 @@ int start_daemon(){
 			perror("write");
 			exit(EXIT_FAILURE);
 		}
+		if (!strncmp(command,"release",7)){
+			printf("checking locks for a match to %s...\n",name);
+			for (int i=0;i<locks.number_of_locks;i++){
+				printf("\n%s",locks.lock_name[i]);
+				if(!strncmp(locks.lock_name[i],name,strlen(name)+1)){
+					lock_status = 1;
+					lock_index = i;
+					printf(" - match\n");
+					break;
+				}
+			}
+			printf("\n\n");
+			if ((lock_status)){
+				printf("lock exists\n");
+				locks.number_of_locks--;
+				locks.lock_name[lock_index] = malloc(sizeof(char)*(strlen(locks.lock_name[locks.number_of_locks])+1));//resize old lock index in prep to move the last index here
+				strcpy(locks.lock_name[lock_index],locks.lock_name[locks.number_of_locks]);// copy the last entry to the old locks index
+				locks.lock_name = realloc(locks.lock_name,sizeof(char*)*locks.number_of_locks);// shrink lock array by 1 (to remove last entry)
+				printf("lock removed\n");
+				lock_status = 0; //1 and 0 are swapped here in favour of returning 0 for a successfull removal over the sending the lock status as 1
+			}else{
+				printf("lock doesnt exist\n");
+				lock_status = 1;
+			}
+		}
+
 	}
 	/* cleanup */
 	printf("cleaning up\n");
@@ -249,6 +291,60 @@ int acquire_lock(char *lock_name){
 	data_socket = connect_named_socket(SERVER_FD);
 	/* let the daemon know we want to aquire a lock */
 	sprintf(buffer,"acquire");
+	result = write(data_socket,buffer,BUFFER_SIZE);
+	if (result<0){
+		perror("write");
+		exit(EXIT_FAILURE);
+	}
+	result = read(data_socket,buffer,BUFFER_SIZE);//confirmation of receive
+	/* transmit the name of the lock */
+	for (int i=0;i<strlen(lock_name);i++){
+		printf("sending %c\n",lock_name[i]);
+		buffer[0] = lock_name[i];
+		result = write(data_socket,buffer,BUFFER_SIZE);
+		if (result<0){
+			perror("write");
+			exit(EXIT_FAILURE);
+		}
+		result = read(data_socket,buffer,BUFFER_SIZE);//confirmation of receive
+		if (result<0){
+			perror("write");
+			exit(EXIT_FAILURE);
+		}
+	}
+	printf("transmiting end of transmition\n");
+	sprintf(buffer,"END");//end of transmition signal
+	result = write(data_socket,buffer,BUFFER_SIZE);
+
+	if (result<0){
+		perror("write");
+		exit(EXIT_FAILURE);
+	}
+	for (;;){ //loop untill we receive an int and not "END"
+		read(data_socket,buffer,BUFFER_SIZE);
+		printf("got buffer for status %s\n",buffer);
+		if (strncmp(buffer,"END",3)){
+			break;
+		}
+	}
+	return_status = atoi(buffer);
+	printf("returned with status %d\n",return_status);
+
+	/* clean up */
+	printf("cleaning up\n");
+	close(data_socket);
+	return return_status;
+}
+int release_lock(char *lock_name){
+	char buffer[BUFFER_SIZE];
+	int return_status = 2;
+	int result;
+	int data_socket;
+	printf("attempting to release lock of name %s\n",lock_name);
+	/* connect to server */
+	data_socket = connect_named_socket(SERVER_FD);
+	/* let the daemon know we want to aquire a lock */
+	sprintf(buffer,"release");
 	result = write(data_socket,buffer,BUFFER_SIZE);
 	if (result<0){
 		perror("write");
