@@ -174,23 +174,6 @@ int start_daemon(){
 				lock_status = 1;
 			}
 		}
-		if (!strncmp(command,"query",5)){
-			printf("checking lock status of lock named %s\n",name);
-			for (int i=0;i<locks.number_of_locks;i++){
-				if(!strncmp(locks.lock_name[i],name,strlen(name))){
-					lock_status = 1;
-				}else{
-					lock_status = 0;
-				}
-			}
-		}
-		sprintf(buffer,"%d",lock_status);
-		printf("sending return status of %s\n",buffer);
-		result = write(data_socket,buffer,BUFFER_SIZE);
-		if (result<0){
-			perror("write");
-			exit(EXIT_FAILURE);
-		}
 		if (!strncmp(command,"release",7)){
 			printf("checking locks for a match to %s...\n",name);
 			for (int i=0;i<locks.number_of_locks;i++){
@@ -216,7 +199,23 @@ int start_daemon(){
 				lock_status = 1;
 			}
 		}
-
+		if (!strncmp(command,"query",5)){
+			printf("checking lock status of lock named %s\n",name);
+			for (int i=0;i<locks.number_of_locks;i++){
+				if(!strncmp(locks.lock_name[i],name,strlen(name))){
+					lock_status = 1;
+				}else{
+					lock_status = 0;
+				}
+			}
+		}
+		sprintf(buffer,"%d",lock_status);
+		printf("sending return status of %s\n",buffer);
+		result = write(data_socket,buffer,BUFFER_SIZE);
+		if (result<0){
+			perror("write");
+			exit(EXIT_FAILURE);
+		}
 	}
 	/* cleanup */
 	printf("cleaning up\n");
