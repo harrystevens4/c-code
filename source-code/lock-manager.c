@@ -10,7 +10,7 @@
 #include <sys/socket.h>
 #include <sys/un.h>
 #include <stddef.h>
-#define SERVER_FD "/tmp/harry/sockets/lock_manager_server.sock"
+#define SERVER_FD "/tmp/lock_manager_server.sock"
 #define PORT 9000
 #define BUFFER_SIZE 12
 int start_daemon();
