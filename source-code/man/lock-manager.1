@@ -1,0 +1,23 @@
+.\" Manpage for lock-manager
+.TH man 8 "1 July 2024" "1.0" "lock-manager man page"
+.SH NAME
+lock-manager
+.SH SYNOPSIS
+Holds and manages virtual locks
+.SH DESCRIPTION
+The lock-manager daemon holds lock names. These can be aquired, queried, and released with the lock-manager command. The lock-manager command will return status of 0 if it wass successful and 1 if unsucsessful, so for -q, will return 0 if it does not already exist. These locks are stored in ram and are deleted on restart.
+.SH SYNTAX
+lock-manager [options]
+.SH OPTIONS:
+-a : Aquire a named lock
+.br
+-r : Release a named lock
+.br
+-q : Query (or check) the status (locked or unlocked) of a named lock
+.El
+.SH SEE ALSO
+Nothing currently. 
+.SH BUGS
+Issue with permitions for the socket file (due to creation from a program running under root)
+.SH AUTHOR
+rufus173
