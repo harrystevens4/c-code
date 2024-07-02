@@ -107,7 +107,7 @@ char *receive_string(int socket){
 	int result;
 	char *string = malloc(sizeof(char));
 	int index = 0;
-	printf("using socket %d\n",socket);
+	//printf("using socket %d\n",socket);
 	for (;;){
 		result = read(socket,buffer,buffer_size);
 		if (result<0){
@@ -115,23 +115,23 @@ char *receive_string(int socket){
 			exit(EXIT_FAILURE);
 		}
 		if (!(strncmp(buffer,END,strlen(END)))){
-			printf("got end of transmition signal\n");
+			//printf("got end of transmition signal\n");
 			string[index] = '\0';
 			break;
 		}
-		printf("buffer received of %c\n",buffer[0]);
+		//printf("buffer received of %c\n",buffer[0]);
 		string[index] = buffer[0];
 		index++;
 		string = realloc(string,sizeof(char)*(index+1));
-		printf("current string stands at %s, continuing to build\n",string);
+		//printf("current string stands at %s, continuing to build\n",string);
 		sprintf(buffer,ACK);
-		printf("sending acknowledgement of %s\n",buffer);
+		//printf("sending acknowledgement of %s\n",buffer);
 		result = write(socket,buffer,4);//standard length for command verbs is 3 chars + \0
 		if (result<0){
 			perror("write");
 			exit(EXIT_FAILURE);
 		}
-		printf("acknowledgement sent\n");
+		//printf("acknowledgement sent\n");
 	}
 	return string;
 }
@@ -140,21 +140,25 @@ int send_string(int socket,const char *string){
 	int result;
 	for (int index=0;index<strlen(string);index++){
 		sprintf(buffer,"%c",string[index]);
-		printf("sending %c\n",buffer[0]);
+		//printf("sending %c\n",buffer[0]);
 		result = write(socket,buffer,4);
 		if (result<0){
 			perror("write");
 			exit(EXIT_FAILURE);
 		}
-		printf("awaiting acknowledgement\n");
+		//printf("awaiting acknowledgement\n");
 		result = read(socket,buffer,4);
 		if (result<0){
 			perror("read");
 			exit(EXIT_FAILURE);
 		}
 	}	
-	printf("sending end of transmition\n");
-	write(socket,"END",4);
+	//printf("sending end of transmition\n");
+	result = write(socket,"END",4);
+	if (result<0){
+		perror("write");
+		exit(EXIT_FAILURE);
+	}
 	return 0;
 }
 int close_named_socket(int socket,const char *filename){
