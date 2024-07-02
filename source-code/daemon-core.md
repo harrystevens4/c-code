@@ -130,3 +130,57 @@ This function should be provided a pointer your locks struct, and will free all 
 
 # Examples of how to use
 
+	#include <stdio.h>
+	#include <unistd.h>
+	#include <stdlib.h>
+	#include <sys/un.h>
+	#include <sys/socket.h>
+	#include "daemon-core.h"
+	#include "args.h"
+	#define SOCKET_FD "/tmp/socket_test.socket"
+	int start_server();
+	int start_client();
+	int main(int argc, char *argv[]){
+		struct args args;
+		parse_args(argc,argv,&args);
+		if (args.single[0] == 's'){ //check for -s option from when binary was executed
+			start_server();
+		}else{
+			start_client();
+		}
+		free_args(&args);
+		return 0;
+	}
+	int start_server(){
+		remove(SOCKET_FD);
+		int server;
+		int client;
+		
+		/* socket */
+		printf("creating socket\n");
+		server = make_named_socket(SOCKET_FD);
+		printf("listening\n");
+		listen(server,2);
+		client = accept(server,NULL,NULL);
+		send_string(client,"based or cringe");
+		printf("closing socket\n");
+
+		/* cleanup */
+		close(client);
+		close_named_socket(server,SOCKET_FD);
+		return 0;
+	}
+	int start_client(){
+		int server;
+		char *string;
+
+		/* socket */
+		printf("attempting to connect to server\n");
+		server = connect_named_socket(SOCKET_FD);
+		string = receive_string(server);
+		printf("got %s\n",string);
+		
+		/* cleanup */
+		free(string);
+		return 0;
+	}
