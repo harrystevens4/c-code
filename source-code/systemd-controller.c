@@ -1,4 +1,5 @@
 #include <ncurses.h>
+#include <string.h>
 #include <dirent.h>
 #include <curses.h> //for the ACS_VLINE defs and such
 #include <stdio.h>
@@ -15,6 +16,25 @@ int main(){
 	curs_set(0);//no cursor
 	keypad(stdscr, TRUE);
 	noecho();
+	
+	char **files = malloc(sizeof(char*));
+	int count = 0;
+	DIR *cur_dir;
+	struct dirent *dir;
+	cur_dir = opendir("/lib/systemd/system");
+	if (cur_dir) {
+		while ((dir = readdir(cur_dir)) != NULL) {
+			if ((dir->d_name != "..") && (dir->d_name != ".")){
+				count++;
+				files = realloc(files,sizeof(char*)*count);
+				files[count-1] = malloc(sizeof(char)*(strlen(dir->d_name)+1));
+				strcpy(files[count-1],dir->d_name);
+				printf("%s\n", dir->d_name);
+			}
+		}
+		closedir(cur_dir);
+	}
+
 	const int term_width = COLS;
 	const int term_height = LINES;
 	const int max_height = 15;
@@ -68,8 +88,9 @@ int main(){
 			mvprintw(i+y+1,mid_x+2,"%s",actions[i]);
 			attrset(COLOR_PAIR(1));
 		}
+
 		for (int i=0;i<height-2;i++){
-			mvprintw(i+y+1,x+2,"based");
+			mvprintw(i+y+1,x+2,"%s",files[i]);
 		}
 		/* refresh */
 		refresh();
@@ -97,6 +118,11 @@ int main(){
 		}
 	}
 	endwin();
+	for (int i=0;i<count;i++){
+		free(files[i]);
+	}
+	free(files);
+
 	printf("finnished successfully\n");
 	printf("term height %d term width %d height %d width %d\n",term_height,term_width,height,width);
 	printf("%d\n",input);
