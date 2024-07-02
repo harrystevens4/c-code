@@ -15,4 +15,7 @@ void free_buffer(struct buffer *buffer);
 void free_locks(struct locks *locks);
 int make_named_socket(const char *filename);
 int connect_named_socket(const char *filename);
+char *receive_string(int socket); //the user is responsible for defining and freeing string
+int send_string(int socket, const char *string);
+int close_named_socket(int socket,const char *filename);
 #endif
