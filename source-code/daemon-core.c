@@ -154,7 +154,7 @@ int send_string(int socket,const char *string){
 		}
 	}	
 	//printf("sending end of transmition\n");
-	result = write(socket,"END",4);
+	result = write(socket,END,4);
 	if (result<0){
 		perror("write");
 		exit(EXIT_FAILURE);
