@@ -1,4 +1,5 @@
 #include <ncurses.h>
+#include <dirent.h>
 #include <curses.h> //for the ACS_VLINE defs and such
 #include <stdio.h>
 #include <stdlib.h>
@@ -7,7 +8,11 @@ int main(){
 	/* initialisation */
 	setlocale(LC_ALL,""); //for unicode chars
 	initscr();
+	start_color();
+	init_pair(1,COLOR_WHITE,COLOR_BLACK);//non highlighted
+	init_pair(2,COLOR_WHITE,COLOR_RED);//highlighted
 	cbreak();
+	curs_set(0);//no cursor
 	keypad(stdscr, TRUE);
 	noecho();
 	const int term_width = COLS;
@@ -40,10 +45,14 @@ int main(){
 	}
 	int x=(int)((term_width/2)-(width/2));
 	int y=(int)((term_height/2)-(height/2));
-	int mid_x = x+(int)(width/2);
 	int input;
 	int exit = 0;
-	int selected = 0;
+	int selected = 0; //selection menu (left side)
+	int action = 0; //action menu (right side)
+	const int number_of_actions = 4;
+	const int action_width = 13; //width of the right side actions
+	const char actions[4][15] = {"<start>","<stop>","<enable>","<disable>"};//right side action menu options
+	int mid_x = x+width-action_width; //x of mid partition
 	refresh();
 	WINDOW *win;
 	win = newwin(height,width,y,x);
@@ -52,9 +61,17 @@ int main(){
 	wrefresh(win);
 	while (!exit){
 		/* selecting options */
-
-		//box(win,0,0);
-		wrefresh(win);
+		for (int i=0;i<number_of_actions;i++){
+			if (i==action){
+				attrset(COLOR_PAIR(2));
+			}
+			mvprintw(i+y+1,mid_x+2,"%s",actions[i]);
+			attrset(COLOR_PAIR(1));
+		}
+		for (int i=0;i<height-2;i++){
+			mvprintw(i+y+1,x+2,"based");
+		}
+		/* refresh */
 		refresh();
 		/* input processing */
 		input = getch();
@@ -62,10 +79,26 @@ int main(){
 			case KEY_F(1):
 				exit=1;
 				break;
+			case 9: //tab
+				action++;
+				if (action>number_of_actions-1){
+					action=0;
+				}
+				break;
+			case 10:
+				exit=1;
+				break;
+			case KEY_UP:
+				selected++;
+				break;
+			case KEY_DOWN:
+				selected--;
+				break;
 		}
 	}
 	endwin();
 	printf("finnished successfully\n");
 	printf("term height %d term width %d height %d width %d\n",term_height,term_width,height,width);
+	printf("%d\n",input);
 	return 0;
 }
