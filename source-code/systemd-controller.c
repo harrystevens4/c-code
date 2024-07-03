@@ -6,7 +6,7 @@
 #include <stdlib.h>
 #include <locale.h>
 int main(){
-	/* initialisation */
+	/* initialisation of ncurses */
 	setlocale(LC_ALL,""); //for unicode chars
 	initscr();
 	start_color();
@@ -25,12 +25,14 @@ int main(){
 	cur_dir = opendir("/lib/systemd/system");
 	if (cur_dir) {
 		while ((dir = readdir(cur_dir)) != NULL) {
-			if ((dir->d_name != "..") && (dir->d_name != ".")){
+			if (strncmp(dir->d_name,"..",2) || strncmp(dir->d_name,".",1)){
+				//continue;
+			}
+			if (dir->d_type == DT_REG){
 				count++;
 				files = realloc(files,sizeof(char*)*count);
 				files[count-1] = malloc(sizeof(char)*(strlen(dir->d_name)+1));
 				strcpy(files[count-1],dir->d_name);
-				printf("%s\n", dir->d_name);
 			}
 		}
 		closedir(cur_dir);
@@ -159,6 +161,7 @@ int main(){
 	}
 	endwin();
 	for (int i=0;i<count;i++){
+		printf("[%s]\n",files[i]);
 		free(files[i]);
 	}
 	free(files);
