@@ -69,6 +69,8 @@ int main(){
 	int exit = 0;
 	int selected = 0; //selection menu (left side)
 	int action = 0; //action menu (right side)
+	int cur_selected = 0;
+	int offset = 0;
 	const int number_of_actions = 4;
 	const int action_width = 13; //width of the right side actions
 	const char actions[4][15] = {"<start>","<stop>","<enable>","<disable>"};//right side action menu options
@@ -90,7 +92,11 @@ int main(){
 		}
 
 		for (int i=0;i<height-2;i++){
-			mvprintw(i+y+1,x+2,"%s",files[i]);
+			if (i==cur_selected){
+				attrset(COLOR_PAIR(2));
+			}
+			mvprintw(i+y+1,x+2,"%s",files[i+offset]);
+			attrset(COLOR_PAIR(1));
 		}
 		/* refresh */
 		refresh();
@@ -110,10 +116,22 @@ int main(){
 				exit=1;
 				break;
 			case KEY_UP:
-				selected++;
+				selected--;
+				if (cur_selected-1<0){
+					if (offset>0){
+						offset--;
+					}
+				}else{
+					cur_selected--;
+				}
 				break;
 			case KEY_DOWN:
-				selected--;
+				selected++;
+				if (cur_selected+1>height-3){
+					offset++;
+				}else{
+					cur_selected++;
+				}
 				break;
 		}
 	}
