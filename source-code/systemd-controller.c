@@ -78,6 +78,7 @@ int main(){
 	const char actions[4][15] = {"<start>","<stop>","<enable>","<disable>"};//right side action menu options
 	int character=0;
 	char letter;
+	int ellipses = 0;
 	int mid_x = x+width-action_width; //x of mid partition
 	refresh();
 	WINDOW *win;
@@ -102,12 +103,18 @@ int main(){
 			for (character=0;character<selection_width;character++){
 				letter = files[i+offset][character];
 				if (letter=='\0'){
+					ellipses = 0;
 					break;
+				}else{
+					ellipses = 1;
 				}
 				mvprintw(i+y+1,x+2+character,"%c",letter);
 			}
 			for (;character<selection_width;character++){
 				mvprintw(i+y+1,x+2+character," ");
+			}
+			if (ellipses){
+				mvprintw(i+y+1,x+selection_width-1,"...");
 			}
 			attrset(COLOR_PAIR(1));
 		}
