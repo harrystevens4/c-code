@@ -17,6 +17,7 @@ int main(){
 	keypad(stdscr, TRUE);
 	noecho();
 	
+	/* file detection */
 	char **files = malloc(sizeof(char*));
 	int count = 0;
 	DIR *cur_dir;
@@ -39,7 +40,7 @@ int main(){
 	const int term_height = LINES;
 	const int max_height = 15;
 	const int min_height = 10;
-	const int max_width = 40;
+	const int max_width = 50;
 	const int min_width = 15;
 	int width;
 	int height;
@@ -73,7 +74,10 @@ int main(){
 	int offset = 0;
 	const int number_of_actions = 4;
 	const int action_width = 13; //width of the right side actions
+	const int selection_width = width - action_width - 3;
 	const char actions[4][15] = {"<start>","<stop>","<enable>","<disable>"};//right side action menu options
+	int character=0;
+	char letter;
 	int mid_x = x+width-action_width; //x of mid partition
 	refresh();
 	WINDOW *win;
@@ -95,7 +99,16 @@ int main(){
 			if (i==cur_selected){
 				attrset(COLOR_PAIR(2));
 			}
-			mvprintw(i+y+1,x+2,"%s",files[i+offset]);
+			for (character=0;character<selection_width;character++){
+				letter = files[i+offset][character];
+				if (letter=='\0'){
+					break;
+				}
+				mvprintw(i+y+1,x+2+character,"%c",letter);
+			}
+			for (;character<selection_width;character++){
+				mvprintw(i+y+1,x+2+character," ");
+			}
 			attrset(COLOR_PAIR(1));
 		}
 		/* refresh */
@@ -126,13 +139,15 @@ int main(){
 				}
 				break;
 			case KEY_DOWN:
-				selected++;
-				if (cur_selected+1>height-3){
-					offset++;
-				}else{
-					cur_selected++;
+				if (selected+1<count){
+					selected++;
+					if (cur_selected+1>height-3){
+						offset++;
+					}else{
+						cur_selected++;
+					}
+					break;
 				}
-				break;
 		}
 	}
 	endwin();
