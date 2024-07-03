@@ -5,6 +5,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <locale.h>
+void alpha_sort(char **list,int length);
 int main(){
 	/* initialisation of ncurses */
 	setlocale(LC_ALL,""); //for unicode chars
@@ -25,10 +26,7 @@ int main(){
 	cur_dir = opendir("/lib/systemd/system");
 	if (cur_dir) {
 		while ((dir = readdir(cur_dir)) != NULL) {
-			if (strncmp(dir->d_name,"..",2) || strncmp(dir->d_name,".",1)){
-				//continue;
-			}
-			if (dir->d_type == DT_REG){
+			if (dir->d_type == DT_REG){//files only
 				count++;
 				files = realloc(files,sizeof(char*)*count);
 				files[count-1] = malloc(sizeof(char)*(strlen(dir->d_name)+1));
@@ -36,8 +34,11 @@ int main(){
 			}
 		}
 		closedir(cur_dir);
+		/* sort alphabeticaly */
+		alpha_sort(files,count);
+	}else{
+		return 1;
 	}
-
 	const int term_width = COLS;
 	const int term_height = LINES;
 	const int max_height = 15;
@@ -170,4 +171,22 @@ int main(){
 	printf("term height %d term width %d height %d width %d\n",term_height,term_width,height,width);
 	printf("%d\n",input);
 	return 0;
+}
+void alpha_sort(char **list,int length){
+	int sorted = 0;
+	char *temp;
+	for (;;){
+		sorted=1;
+		for (int i=0;i<length-1;i++){
+			if (strcmp(list[i],list[i+1])>0){
+				temp = list[i];
+				list[i] = list[i+1];
+				list[i+1] = temp;
+				sorted=0;
+			}
+		}
+		if (sorted){
+			break;
+		}
+	}
 }
