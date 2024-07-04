@@ -79,6 +79,7 @@ int main(){
 	int action = 0; //action menu (right side)
 	int cur_selected = 0;
 	int offset = 0;
+	int status; //return status from commands
 	const int number_of_actions = 5;
 	const int action_width = 13; //width of the right side actions
 	const int selection_width = width - action_width - 3;
@@ -153,13 +154,31 @@ int main(){
 				break;
 			case 10: //enter
 				 switch (action){
-					case 0:
+					case 0://status
 						sprintf(buffer,"/bin/systemctl status %s",files[selected]);
 						exec_cmd((const char *)buffer,&result);
 						popup((const char *)result);
 						
 						break;
-				 }
+					case 1://start
+						sprintf(buffer,"/bin/systemctl start %s",files[selected]);
+						status = system(buffer);
+						if (status){
+							popup("failure :(");
+						}else{
+							popup("success!");
+						}
+						break;
+					case 2://stop
+						sprintf(buffer,"/bin/systemctl stop %s",files[selected]);
+						status = system(buffer);
+						if (status){
+							popup("failure :(");
+						}else{
+							popup("success!");
+						}
+						break;
+				}
 				//exit=1;
 				break;
 			case KEY_UP:
@@ -237,15 +256,16 @@ void popup(const char *message){
 		}
 		if (message[i]=='\n'){
 			message_height++;
-			if (line_length>max_length){
-				max_length=line_length;
-				line_length=1;
-			}
+			line_length=1;
 		}
+		if (line_length>max_length){
+			max_length=line_length;
+		}
+		
 		line_length++;
 	}
 	height += message_height;
-	width = max_length+3;
+	width = max_length+4;
 	if (width < 8){
 		width = 8; //enough space for the " <ok> "
 	}
