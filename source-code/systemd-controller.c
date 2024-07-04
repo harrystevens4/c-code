@@ -6,6 +6,8 @@
 #include <stdlib.h>
 #include <locale.h>
 void alpha_sort(char **list,int length);
+void build_main_win(WINDOW **win);
+void popup(const char *message);
 int main(){
 	/* initialisation of ncurses */
 	setlocale(LC_ALL,""); //for unicode chars
@@ -135,8 +137,9 @@ int main(){
 					action=0;
 				}
 				break;
-			case 10:
-				exit=1;
+			case 10: //enter
+				popup("functionality not implemented yet");
+				//exit=1;
 				break;
 			case KEY_UP:
 				selected--;
@@ -189,4 +192,21 @@ void alpha_sort(char **list,int length){
 			break;
 		}
 	}
+}
+void build_main_win(WINDOW **win){
+	//cleanup whatever was on screen previously
+	clear();
+
+	//put new window to screen
+	refresh();
+}
+void popup(const char *message){
+	/* create popup window */
+	WINDOW *popup_win;
+	popup_win = newwin(10,10,10,10);
+	box(popup_win,0,0);
+	wrefresh(popup_win);
+	/* wait for input to close window */
+	getch();
+	delwin(popup_win);
 }
