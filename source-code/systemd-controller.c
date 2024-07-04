@@ -76,10 +76,10 @@ int main(){
 	int action = 0; //action menu (right side)
 	int cur_selected = 0;
 	int offset = 0;
-	const int number_of_actions = 4;
+	const int number_of_actions = 5;
 	const int action_width = 13; //width of the right side actions
 	const int selection_width = width - action_width - 3;
-	const char actions[4][15] = {"<start>","<stop>","<enable>","<disable>"};//right side action menu options
+	const char actions[5][15] = {"<status>","<start>","<stop>","<enable>","<disable>"};//right side action menu options
 	int character=0;
 	char letter;
 	int ellipses = 0;
@@ -149,9 +149,11 @@ int main(){
 				}
 				break;
 			case 10: //enter
-				popup("functionality not implemented yet");
-				clear();
-				refresh();
+				 switch (action){
+					case 0:
+						popup("functionality not implemented yet\nplease wait\nfor version 2");
+						break;
+				 }
 				//exit=1;
 				break;
 			case KEY_UP:
@@ -208,13 +210,37 @@ void alpha_sort(char **list,int length){
 }
 void popup(const char *message){
 	/* initialise variables */
-	const int height = 4;
+	int height = 3;
 	int width = strlen(message)+4;//1 space padding each side
+	int y = (LINES/2)-2;
+	int offset = 0;//newline offset
+	int shift = 0; //character offset
+
+	/* ajust window size to fit string*/
+	int i;
+	int max_length = 0;
+	int line_length = 1;
+	int message_height = 1;
+	for (i=0;;i++){
+		if (message[i]=='\0'){
+			break;
+		}
+		if (message[i]=='\n'){
+			message_height++;
+			if (line_length>max_length){
+				max_length=line_length;
+				line_length=1;
+			}
+		}
+		line_length++;
+	}
+	height += message_height;
+	width = max_length+3;
 	if (width < 6){
 		width = 6; //enough space for the " <ok> "
 	}
-	int y = (LINES/2)-2;
-	int x = (COLS/2)-2-width/2;
+	int message_length = i;
+	int x = (COLS/2)-2-(width/2);
 
 	/* create popup window */
 	WINDOW *popup_win;
@@ -222,12 +248,23 @@ void popup(const char *message){
 	refresh();
 	box(popup_win,0,0);
 	wrefresh(popup_win);
-	mvprintw(y+1,x+2,"%s",message);
+	for (i=0;i<message_length;i++){
+		if (message[i] == '\n'){
+			offset++;
+			shift=0;
+			continue;
+		}
+		mvprintw(y+1+offset,x+2+shift,"%c",message[i]);
+		shift++;
+	}
 	attrset(COLOR_PAIR(2));
-	mvprintw(y+2,x+(int)(width/2)-3," <ok> ");
+	mvprintw(y+height-2,x+(int)(width/2)-3," <ok> ");
 	attrset(COLOR_PAIR(1));
 	refresh();
 	/* wait for input to close window */
 	getch();
+	/* return screen to og state */
 	delwin(popup_win);
+	clear();
+	refresh();
 }
