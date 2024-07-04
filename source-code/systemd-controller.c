@@ -178,6 +178,25 @@ int main(){
 							popup("success!");
 						}
 						break;
+					case 3://enable
+						sprintf(buffer,"/bin/systemctl enable %s",files[selected]);
+						status = system(buffer);
+						if (status){
+							popup("failure :(");
+						}else{
+							popup("success!");
+						}
+						break;
+					case 4://disable
+						sprintf(buffer,"/bin/systemctl disable %s",files[selected]);
+						status = system(buffer);
+						if (status){
+							popup("failure :(");
+						}else{
+							popup("success!");
+						}
+						break;
+
 				}
 				//exit=1;
 				break;
