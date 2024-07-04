@@ -246,11 +246,17 @@ void popup(const char *message){
 	}
 	height += message_height;
 	width = max_length+3;
-	if (width < 6){
-		width = 6; //enough space for the " <ok> "
+	if (width < 8){
+		width = 8; //enough space for the " <ok> "
+	}
+	if (width > COLS){
+		width = COLS;
 	}
 	int message_length = i;
 	int x = (COLS/2)-2-(width/2);
+	if (x<0){
+		x=0;
+	}
 	int y = (LINES/2)-(height/2);
 
 	/* create popup window */
