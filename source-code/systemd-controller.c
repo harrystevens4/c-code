@@ -212,7 +212,6 @@ void popup(const char *message){
 	/* initialise variables */
 	int height = 3;
 	int width = strlen(message)+4;//1 space padding each side
-	int y = (LINES/2)-2;
 	int offset = 0;//newline offset
 	int shift = 0; //character offset
 
@@ -241,10 +240,11 @@ void popup(const char *message){
 	}
 	int message_length = i;
 	int x = (COLS/2)-2-(width/2);
+	int y = (LINES/2)-(height/2);
 
 	/* create popup window */
 	WINDOW *popup_win;
-	popup_win = newwin(height,width,10,x);
+	popup_win = newwin(height,width,y,x);
 	refresh();
 	box(popup_win,0,0);
 	wrefresh(popup_win);
