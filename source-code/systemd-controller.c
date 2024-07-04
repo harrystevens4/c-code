@@ -6,7 +6,6 @@
 #include <stdlib.h>
 #include <locale.h>
 void alpha_sort(char **list,int length);
-void build_main_win(WINDOW **win);
 void popup(const char *message);
 int main(){
 	/* initialisation of ncurses */
@@ -86,12 +85,23 @@ int main(){
 	int ellipses = 0;
 	int mid_x = x+width-action_width; //x of mid partition
 	refresh();
+
+	//cleanup whatever was on screen previously
+	clear();
+	/* initialise the window */
 	WINDOW *win;
 	win = newwin(height,width,y,x);
-	box(win,0,0);
-	mvvline(y+1,mid_x,ACS_VLINE,height-2);//centre partition
-	wrefresh(win);
+	refresh();
+
+	//put new window to screen
+	refresh();
+
 	while (!exit){
+		/* redraw */	
+		box(win,0,0);
+		mvvline(y+1,mid_x,ACS_VLINE,height-2);//centre partition
+		wrefresh(win);
+
 		/* selecting options */
 		for (int i=0;i<number_of_actions;i++){
 			if (i==action){
@@ -123,8 +133,9 @@ int main(){
 			}
 			attrset(COLOR_PAIR(1));
 		}
-		/* refresh */
+		/* push to screen */
 		refresh();
+
 		/* input processing */
 		input = getch();
 		switch (input){
@@ -139,6 +150,8 @@ int main(){
 				break;
 			case 10: //enter
 				popup("functionality not implemented yet");
+				clear();
+				refresh();
 				//exit=1;
 				break;
 			case KEY_UP:
@@ -193,19 +206,27 @@ void alpha_sort(char **list,int length){
 		}
 	}
 }
-void build_main_win(WINDOW **win){
-	//cleanup whatever was on screen previously
-	clear();
-
-	//put new window to screen
-	refresh();
-}
 void popup(const char *message){
+	/* initialise variables */
+	const int height = 4;
+	int width = strlen(message)+4;//1 space padding each side
+	if (width < 6){
+		width = 6; //enough space for the " <ok> "
+	}
+	int y = (LINES/2)-2;
+	int x = (COLS/2)-2-width/2;
+
 	/* create popup window */
 	WINDOW *popup_win;
-	popup_win = newwin(10,10,10,10);
+	popup_win = newwin(height,width,10,x);
+	refresh();
 	box(popup_win,0,0);
 	wrefresh(popup_win);
+	mvprintw(y+1,x+2,"%s",message);
+	attrset(COLOR_PAIR(2));
+	mvprintw(y+2,x+(int)(width/2)-3," <ok> ");
+	attrset(COLOR_PAIR(1));
+	refresh();
 	/* wait for input to close window */
 	getch();
 	delwin(popup_win);
