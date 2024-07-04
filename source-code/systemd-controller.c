@@ -6,6 +6,7 @@
 #include <stdlib.h>
 #include <locale.h>
 void alpha_sort(char **list,int length);
+void exec_cmd(const char *command,char **output);
 void popup(const char *message);
 int main(){
 	/* initialisation of ncurses */
@@ -48,6 +49,8 @@ int main(){
 	const int min_width = 15;
 	int width;
 	int height;
+	char *result; //storing the output from commands
+	char buffer[1024]; //cant be bother to dynamicaly alocate (for the concatinated command)
 	/* height setup */
 	if (term_height<=max_height){
 		if(term_height>=min_height){
@@ -151,13 +154,18 @@ int main(){
 			case 10: //enter
 				 switch (action){
 					case 0:
-						popup("functionality not implemented yet\nplease wait\nfor version 2");
+						sprintf(buffer,"/bin/systemctl status %s",files[selected]);
+						exec_cmd((const char *)buffer,&result);
+						popup((const char *)result);
+						
 						break;
 				 }
 				//exit=1;
 				break;
 			case KEY_UP:
-				selected--;
+				if (selected > 0){
+					selected--;
+				}
 				if (cur_selected-1<0){
 					if (offset>0){
 						offset--;
@@ -188,6 +196,9 @@ int main(){
 	printf("finnished successfully\n");
 	printf("term height %d term width %d height %d width %d\n",term_height,term_width,height,width);
 	printf("%d\n",input);
+	exec_cmd("/bin/ls /home/harry/cbin",&result);
+	printf("%s",result);
+	free(result);
 	return 0;
 }
 void alpha_sort(char **list,int length){
@@ -268,3 +279,28 @@ void popup(const char *message){
 	clear();
 	refresh();
 }
+void exec_cmd(const char *command,char **output){
+	*output = malloc(sizeof(char));
+	FILE *file_pointer;
+	char path[1035];
+	int count = 0;
+
+	file_pointer = popen(command,"r");
+	if (file_pointer == NULL){
+		printf("could not open file\n");
+		return;
+	}
+	while (fgets(path, sizeof(path), file_pointer) != NULL){
+		for (int character = 0;;character++){
+			*output = realloc(*output,sizeof(char)*(count+1));
+			if (path[character] == '\0'){
+				break;
+			}else{
+				output[0][count] = path[character];
+			}
+			count++;
+		}
+	}
+	pclose(file_pointer);
+}
+
