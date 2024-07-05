@@ -226,17 +226,17 @@ int main(){
 	}
 	endwin();
 	for (int i=0;i<count;i++){
-		printf("[%s]\n",files[i]);
+		//printf("[%s]\n",files[i]);
 		free(files[i]);
 	}
 	free(files);
 
 	printf("finnished successfully\n");
-	printf("term height %d term width %d height %d width %d\n",term_height,term_width,height,width);
+	//printf("term height %d term width %d height %d width %d\n",term_height,term_width,height,width);
 	printf("%d\n",input);
-	exec_cmd("/bin/ls /home/harry/cbin",&result);
-	printf("%s",result);
-	free(result);
+	//exec_cmd("/bin/ls /home/harry/cbin",&result);
+	//printf("%s",result);
+	//free(result);
 	return 0;
 }
 void alpha_sort(char **list,int length){
@@ -310,7 +310,9 @@ void popup(const char *message){
 			shift=0;
 			continue;
 		}
-		mvprintw(y+1+offset,x+2+shift,"%c",message[i]);
+		if (!(shift>=width-4)){
+			mvprintw(y+1+offset,x+2+shift,"%c",message[i]);
+		}
 		shift++;
 	}
 	attrset(COLOR_PAIR(2));
