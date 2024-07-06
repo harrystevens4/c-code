@@ -9,17 +9,18 @@
 #define SOCKET_FD "/tmp/fancy-notify.socket"
 #define SIMPLE "simple notification"
 #define KILL "kill"
-struct notifications{
-	char **notifications;
+struct simple_notifications{
+	char **messages;
 	int count;
 };
 volatile int stop = 0; //turned to 1 when ctr-c is sent to stop daemon gracefully
 volatile int stop_count = 0; //number of stop signals received
+volatile int lock; // 0 for unlocked, 1 for locked
 int force = 0; //from -f flag
 
 void handle_signal(int sig);
 int start_daemon();
-int kill_daemon();
+void kill_daemon();
 int simple_notification(const char* text);
 
 int main(int argc, char* argv[]){
@@ -43,8 +44,10 @@ int main(int argc, char* argv[]){
 				break;
 			case 's': //simple type
 				simple_notification("this is a notification");
+				break;
 			case 'k': //kill daemon
 				kill_daemon();
+				break;
 		}
 	}
 	/* cleanup */
@@ -55,9 +58,9 @@ int start_daemon(){
 	signal(SIGINT, handle_signal);
 
 	/* set up notification buffer */
-	struct notifications notifications;
-	notifications.count = 0;
-	notifications.notifications = malloc(sizeof(char*));
+	struct simple_notifications simple_notifications;
+	simple_notifications.count = 0;
+	simple_notifications.messages = malloc(sizeof(char*));
 	
 	/* set up sockets */
 	if (access(SOCKET_FD, F_OK) == 0){
@@ -79,7 +82,21 @@ int start_daemon(){
 		data_socket = accept(server,NULL,NULL);
 		buffer = receive_string(data_socket);
 		if (strcmp(buffer,SIMPLE) == 0){
-			printf("creating simple notification\n");
+			printf("aquiring simple notification lock\n");
+			for (;;){//spinlock for main thread to ensure it is not using the array
+				if (lock == 1){
+					continue;
+				}else{
+					lock = 1;
+					break;
+				}
+			}
+			printf("aquired\n");
+			simple_notifications.count++;
+			simple_notifications.messages = realloc(simple_notifications.messages,sizeof(char*)*(simple_notifications.count));
+			simple_notifications.messages[simple_notifications.count-1] = malloc((strlen(buffer)+1)*sizeof(char));
+			lock = 0;
+			printf("released\n");
 		}else if (strcmp(buffer,KILL) == 0){
 			printf("stopping daemon\n");
 			stop = 1;
@@ -92,10 +109,10 @@ int start_daemon(){
 	/* cleanup and success */
 	close(server);
 	remove(SOCKET_FD);
-	for (int i = 0;i<notifications.count;i++){
-		free(notifications.notifications[i]);
+	for (int i = 0;i<simple_notifications.count;i++){
+		free(simple_notifications.messages[i]);
 	}
-	free(notifications.notifications);
+	free(simple_notifications.messages);
 	return 0;
 }
 int simple_notification(const char* text){
@@ -121,7 +138,8 @@ void handle_signal(int sig){
 	}
 	signal(sig, handle_signal);
 }
-int kill_daemon(){
+void kill_daemon(){
+	printf("attempting to kill daemon\n");
 	int data_socket = connect_named_socket(SOCKET_FD);
 	send_string(data_socket,KILL);
 	close(data_socket);
