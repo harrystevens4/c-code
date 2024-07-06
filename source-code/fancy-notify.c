@@ -134,22 +134,27 @@ int start_daemon(){
 void *main_thread(){
 	char *simple_notification_message;
 	while (!stop){
-		if (pthread_mutex_lock(&lock)!=0){
+		if (pthread_mutex_lock(&lock)!=0){//aquire lock
 			fprintf(stderr,"critical mutex error in main_thread\n");
 			exit(EXIT_FAILURE);
 		}
 		/* simple notifications */
 		if (simple_notifications.count > 0){
 			//printf("main_thread: processing simple notification...\n");
-			simple_notification_message=simple_notifications.messages[simple_notifications.count-1];
+			simple_notification_message=simple_notifications.messages[simple_notifications.count-1]; //copy over message so we can release the lock and use a local copy
 			simple_notifications.count--;
-			printf("%s\n",simple_notification_message);
+			printf("creating notification %s\n",simple_notification_message);
 			//printf("main_thread: done\n");
+			//release lock as early as possible
+			if (pthread_mutex_unlock(&lock)!=0){//release lock
+				fprintf(stderr,"critical mutex error in main_thread\n");
+				exit(EXIT_FAILURE);
+
+			}
+			system("/usr/local/bin/simple-notification.py");
 		}
-		if (pthread_mutex_unlock(&lock)!=0){
-			fprintf(stderr,"critical mutex error in main_thread\n");
-			exit(EXIT_FAILURE);
-		}
+		pthread_mutex_unlock(&lock);//failsafe
+		//sleep(2); //simulated delay
 	}
 	return NULL;
 }
