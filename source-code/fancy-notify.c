@@ -51,7 +51,11 @@ int main(int argc, char* argv[]){
 				force = 1;
 				break;
 			case 's': //simple type
-				simple_notification("this is a notification");
+				if (arguments.number_other != 1){
+					fprintf(stderr,"not enough args provided\n");
+					exit(EXIT_FAILURE);
+				}
+				simple_notification((const char *)arguments.other[0]);
 				break;
 			case 'k': //kill daemon
 				kill_daemon();
@@ -93,6 +97,7 @@ int start_daemon(){
 		data_socket = accept(server,NULL,NULL);
 		buffer = receive_string(data_socket);
 		if (strcmp(buffer,SIMPLE) == 0){
+			buffer = receive_string(data_socket);
 			printf("aquiring simple notification lock\n");
 
 			if (pthread_mutex_lock(&lock)!=0){
@@ -133,6 +138,7 @@ int start_daemon(){
 }
 void *main_thread(){
 	char *simple_notification_message;
+	char *buffer;
 	while (!stop){
 		if (pthread_mutex_lock(&lock)!=0){//aquire lock
 			fprintf(stderr,"critical mutex error in main_thread\n");
@@ -151,7 +157,9 @@ void *main_thread(){
 				exit(EXIT_FAILURE);
 
 			}
-			system("/usr/local/bin/simple-notification.py");
+			buffer = malloc(strlen(simple_notification_message)+60);
+			sprintf(buffer,"/usr/local/bin/simple-notification.py \"%s\"",simple_notification_message);
+			system(buffer);
 		}
 		pthread_mutex_unlock(&lock);//failsafe
 		//sleep(2); //simulated delay
@@ -161,6 +169,7 @@ void *main_thread(){
 int simple_notification(const char* text){
 	int data_socket = connect_named_socket(SOCKET_FD);
 	send_string(data_socket,SIMPLE);
+	send_string(data_socket,text);
 
 	/* cleanup */
 	close(data_socket);
