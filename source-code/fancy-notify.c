@@ -16,7 +16,8 @@ struct simple_notifications{
 };
 volatile int stop = 0; //turned to 1 when ctr-c is sent to stop daemon gracefully
 volatile int stop_count = 0; //number of stop signals received
-volatile int lock; // 0 for unlocked, 1 for locked
+pthread_mutex_t lock;
+
 int force = 0; //from -f flag
 struct simple_notifications simple_notifications;
 
@@ -27,6 +28,10 @@ int simple_notification(const char* text);
 void *main_thread();
 
 int main(int argc, char* argv[]){
+	/* mutex init */
+	if (pthread_mutex_init(&lock, NULL)!=0){
+		fprintf(stderr,"could not initialise vital mutex\n");
+	}
 	/* argument processing */
 	struct args arguments;
 	parse_args(argc,argv,&arguments);
@@ -89,14 +94,13 @@ int start_daemon(){
 		buffer = receive_string(data_socket);
 		if (strcmp(buffer,SIMPLE) == 0){
 			printf("aquiring simple notification lock\n");
-			for (;;){//spinlock for main thread to ensure it is not using the array
-				if (lock == 1){
-					continue;
-				}else{
-					lock = 1;
-					break;
-				}
+
+			if (pthread_mutex_lock(&lock)!=0){
+				fprintf(stderr,"critical mutex error in main_thread\n");
+				exit(EXIT_FAILURE);
 			}
+
+
 			printf("aquired\n");
 			simple_notifications.count++;
 			simple_notifications.messages = realloc(simple_notifications.messages,sizeof(char*)*(simple_notifications.count));
@@ -104,7 +108,10 @@ int start_daemon(){
 			simple_notifications.messages[simple_notifications.count-1] = malloc((strlen(buffer)+1)*sizeof(char));
 			sprintf(simple_notifications.messages[simple_notifications.count-1],"%s",buffer);
 			printf("releasing...\n");
-			int lock = 0;
+			if (pthread_mutex_unlock(&lock)!=0){
+				fprintf(stderr,"critical mutex error in main\n");
+				exit(EXIT_FAILURE);
+			}
 		}else if (strcmp(buffer,KILL) == 0){
 			printf("stopping daemon\n");
 			stop = 1;
@@ -121,17 +128,16 @@ int start_daemon(){
 		free(simple_notifications.messages[i]);
 	}
 	free(simple_notifications.messages);
+	pthread_mutex_destroy(&lock);
 	return 0;
 }
 void *main_thread(){
 	char *simple_notification_message;
 	while (!stop){
-		for (;;){
-			if (lock==0){
-				break;
-			}
+		if (pthread_mutex_lock(&lock)!=0){
+			fprintf(stderr,"critical mutex error in main_thread\n");
+			exit(EXIT_FAILURE);
 		}
-		lock = 1;// aquire lock
 		/* simple notifications */
 		if (simple_notifications.count > 0){
 			//printf("main_thread: processing simple notification...\n");
@@ -140,7 +146,10 @@ void *main_thread(){
 			printf("%s\n",simple_notification_message);
 			//printf("main_thread: done\n");
 		}
-		lock = 0;// release lock
+		if (pthread_mutex_unlock(&lock)!=0){
+			fprintf(stderr,"critical mutex error in main_thread\n");
+			exit(EXIT_FAILURE);
+		}
 	}
 	return NULL;
 }
