@@ -204,8 +204,8 @@ void *main_thread(){
 			if (audio_notifications.count > 2){ //dont realloc to array with 0 elements
 				audio_notifications.messages = realloc(audio_notifications.messages,sizeof(audio_notifications.count-1));
 			}
-			buffer = malloc(sizeof(char)*(strlen(audio_notifications.messages[audio_notifications.count-1])+15));//redundancy and space for the "spd-say"
-			sprintf(buffer,"spd-say -w \"%s\"",audio_notifications.messages[audio_notifications.count-1]);//copy it over so we dont have to hold the lock longer then necesary
+			buffer = malloc(sizeof(char)*(strlen(audio_notifications.messages[audio_notifications.count-1])+20));//redundancy and space for the "spd-say"
+			sprintf(buffer,"sudo -u harry /usr/bin/spd-say -w \"%s\"",audio_notifications.messages[audio_notifications.count-1]);//copy it over so we dont have to hold the lock longer then necesary
 			free(audio_notifications.messages[audio_notifications.count-1]);
 			audio_notifications.count--;
 			unlock_mutex();//move to unsafe
