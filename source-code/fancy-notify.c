@@ -11,8 +11,6 @@
 #define SIMPLE "simple notification"
 #define KILL "kill"
 #define AUDIO "audio"
-#define LOCK() (if (pthread_mutex_lock(&lock)!=0){fprintf(stderr,"critical mutex error in main_thread\n");exit(EXIT_FAILURE);})
-#define UNLOCK() (if (pthread_mutex_release(&lock)!=0){fprintf(stderr,"critical mutex error in main_thread\n");exit(EXIT_FAILURE);})
 struct simple_notifications{
 	char **messages;
 	int count;
@@ -27,10 +25,13 @@ pthread_mutex_t lock;
 
 int force = 0; //from -f flag
 struct simple_notifications simple_notifications;
+struct audio_notifications audio_notifications;
 
 void handle_signal(int sig);
 void audio_notification(const char *message);
 int start_daemon();
+void lock_mutex();
+void unlock_mutex();
 void kill_daemon();
 int simple_notification(const char* text);
 void *main_thread();
@@ -83,6 +84,8 @@ int start_daemon(){
 	/* set up notification buffer */
 	simple_notifications.count = 0;
 	simple_notifications.messages = malloc(sizeof(char*));
+	audio_notifications.count = 0;
+	audio_notifications.messages = malloc(sizeof(char*));
 	
 	/* set up main thread for processing notifications */
 	pthread_t thread_id;
@@ -107,6 +110,8 @@ int start_daemon(){
 	while (!stop){
 		data_socket = accept(server,NULL,NULL);
 		buffer = receive_string(data_socket);
+
+		/* simple notifications */
 		if (strcmp(buffer,SIMPLE) == 0){
 			buffer = receive_string(data_socket);
 			printf("aquiring simple notification lock\n");
@@ -128,9 +133,21 @@ int start_daemon(){
 				fprintf(stderr,"critical mutex error in main\n");
 				exit(EXIT_FAILURE);
 			}
+		/* kill */
 		}else if (strcmp(buffer,KILL) == 0){
 			printf("stopping daemon\n");
 			stop = 1;
+
+		/* audio notifications */
+		}else if (strcmp(buffer,AUDIO) == 0){//audio notificaitons
+			buffer = receive_string(data_socket);
+			printf("got new audio notification of %s\n",buffer);
+			lock_mutex();//safe zone
+			audio_notifications.count++;
+			audio_notifications.messages = realloc(audio_notifications.messages,sizeof(char*)*audio_notifications.count);
+			audio_notifications.messages[audio_notifications.count-1] = malloc(strlen(buffer)+1);
+			sprintf(audio_notifications.messages[audio_notifications.count-1],"%s",buffer);
+			unlock_mutex();//back to unsafe
 		}
 		//clean up ready for next connection
 		free(buffer);
@@ -140,10 +157,18 @@ int start_daemon(){
 	/* cleanup and success */
 	close(server);
 	remove(SOCKET_FD);
+	/* simple notifications */
 	for (int i = 0;i<simple_notifications.count;i++){
+
 		free(simple_notifications.messages[i]);
 	}
 	free(simple_notifications.messages);
+	/* audio notifications */
+	for (int i = 0;i<audio_notifications.count;i++){
+		free(audio_notifications.messages[i]);
+	}
+	free(audio_notifications.messages);
+
 	pthread_mutex_destroy(&lock);
 	return 0;
 }
@@ -172,6 +197,10 @@ void *main_thread(){
 			sprintf(buffer,"/usr/local/bin/simple-notification.py \"%s\"",simple_notification_message);
 			system(buffer);
 		}
+		if (audio_notifications.count > 0){
+			lock_mutex();
+			//do stuff
+			unlock_mutex();
 		pthread_mutex_unlock(&lock);//failsafe
 		//sleep(2); //simulated delay
 	}
@@ -211,4 +240,16 @@ void kill_daemon(){
 	int data_socket = connect_named_socket(SOCKET_FD);
 	send_string(data_socket,KILL);
 	close(data_socket);
+}
+void lock_mutex(){
+	if (pthread_mutex_lock(&lock)!=0){
+		fprintf(stderr,"critical mutex error\n");
+		exit(EXIT_FAILURE);
+	}
+}
+void unlock_mutex(){
+	if (pthread_mutex_unlock(&lock)!=0){
+		fprintf(stderr,"critical mutex error\n");
+		exit(EXIT_FAILURE);
+	}
 }
