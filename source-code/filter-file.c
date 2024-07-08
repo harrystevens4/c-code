@@ -18,7 +18,9 @@ int main(int argc, char* argv[]){
 		return 2;
 	}
 	/* process file */
+	//printf("getting lines...\n");
 	get_lines(&lines,doc);
+	//printf("got lines...\n");
 	//for (int i=0;i<lines.line_count;i++){
 	//	printf("line %d has a char count of %d and content of:%s",i,lines.line_length[i],lines.lines[i]);
 	//}
