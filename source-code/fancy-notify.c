@@ -10,7 +10,14 @@
 #define SOCKET_FD "/tmp/fancy-notify.socket"
 #define SIMPLE "simple notification"
 #define KILL "kill"
+#define AUDIO "audio"
+#define LOCK() (if (pthread_mutex_lock(&lock)!=0){fprintf(stderr,"critical mutex error in main_thread\n");exit(EXIT_FAILURE);})
+#define UNLOCK() (if (pthread_mutex_release(&lock)!=0){fprintf(stderr,"critical mutex error in main_thread\n");exit(EXIT_FAILURE);})
 struct simple_notifications{
+	char **messages;
+	int count;
+};
+struct audio_notifications{
 	char **messages;
 	int count;
 };
@@ -22,6 +29,7 @@ int force = 0; //from -f flag
 struct simple_notifications simple_notifications;
 
 void handle_signal(int sig);
+void audio_notification(const char *message);
 int start_daemon();
 void kill_daemon();
 int simple_notification(const char* text);
@@ -59,6 +67,9 @@ int main(int argc, char* argv[]){
 				break;
 			case 'k': //kill daemon
 				kill_daemon();
+				break;
+			case 'a': //audio
+				audio_notification((const char *)arguments.other[0]);
 				break;
 		}
 	}
@@ -165,6 +176,11 @@ void *main_thread(){
 		//sleep(2); //simulated delay
 	}
 	return NULL;
+}
+void audio_notification(const char *message){
+	int data_socket = connect_named_socket(SOCKET_FD);
+	send_string(data_socket,AUDIO);
+	send_string(data_socket,message);
 }
 int simple_notification(const char* text){
 	int data_socket = connect_named_socket(SOCKET_FD);
