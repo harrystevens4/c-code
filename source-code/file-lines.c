@@ -14,11 +14,14 @@ void get_lines(struct lines *lines,FILE* doc){
 	lines->line_length = malloc(sizeof(int)); //set up array of line lengths
 	for (;;){ //itterate trhough the whole document
 		for (;;){ //itterate through one line
+			//printf("getting char\n");
 			character = fgetc(doc);
+			//printf("got char\n");
 			if (feof(doc)){
 				done = 1;
 				break;
 			}
+			//printf("got %c\n",character);
 			line_length++;
 			line = realloc(line,sizeof(char)*(line_length+1));
 			line[line_length-1] = character;
@@ -29,12 +32,17 @@ void get_lines(struct lines *lines,FILE* doc){
 		if (done){
 			break;
 		}
-		line[line_length] = '\0';	
+		//printf("adding null...\n");
+		line[line_length] = '\0';
+		//printf("realocating line_length\n");	
 		lines->line_length = realloc(lines->line_length,sizeof(int)*(line_count+1));
+		//printf("updating line_length[%d]\n",line_count);
 		lines->line_length[line_count] = line_length;
 		line_count++;
+		//printf("reallocing lines to %d*sizeof(char*)\n",line_count);
 		lines->lines = realloc(lines->lines,sizeof(char*)*line_count);
-		lines->lines[line_count-1] = realloc(lines->lines[line_count-1],sizeof(char)*(line_length+1));
+		//printf("allocating %d chars to index %d of lines\n",line_length+1,line_count-1);
+		lines->lines[line_count-1] = malloc(sizeof(char)*(line_length+1));
 		strcpy(lines->lines[line_count-1],line);
 		line_length = 0;
 
