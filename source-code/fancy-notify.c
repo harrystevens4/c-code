@@ -198,9 +198,20 @@ void *main_thread(){
 			system(buffer);
 		}
 		if (audio_notifications.count > 0){
-			lock_mutex();
-			//do stuff
-			unlock_mutex();
+			printf("new audio notification detected\n");
+			//lock_mutex();//start of safety //locked further up
+			printf("aquired lock\n");
+			if (audio_notifications.count > 2){ //dont realloc to array with 0 elements
+				audio_notifications.messages = realloc(audio_notifications.messages,sizeof(audio_notifications.count-1));
+			}
+			buffer = malloc(sizeof(char)*(strlen(audio_notifications.messages[audio_notifications.count-1])+15));//redundancy and space for the "spd-say"
+			sprintf(buffer,"spd-say -w \"%s\"",audio_notifications.messages[audio_notifications.count-1]);//copy it over so we dont have to hold the lock longer then necesary
+			free(audio_notifications.messages[audio_notifications.count-1]);
+			audio_notifications.count--;
+			unlock_mutex();//move to unsafe
+			fprintf(stdout,"in main_thread with audio notification with message %s\n",buffer);
+			system(buffer);// equivalent to spd-say "$message"
+		}
 		pthread_mutex_unlock(&lock);//failsafe
 		//sleep(2); //simulated delay
 	}
