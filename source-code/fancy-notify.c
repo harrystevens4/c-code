@@ -193,6 +193,7 @@ void *main_thread(){
 		}
 		/* simple notifications */
 		if (simple_notifications.count > 0){
+			printf("------ SAFE ------\n");
 			//printf("main_thread: processing simple notification...\n");
 			simple_notification_message=simple_notifications.messages[simple_notifications.count-1]; //copy over message so we can release the lock and use a local copy
 			simple_notifications.count--;
@@ -209,6 +210,7 @@ void *main_thread(){
 			system(buffer);
 		}
 		if (audio_notifications.count > 0){
+			printf("------ SAFE ------\n");
 			printf("main_thread: new audio notification detected\n");
 			//lock_mutex();//start of safety //locked further up
 			printf("main_thread: aquired lock\nnumber of audio notifications: %d\n",audio_notifications.count);
@@ -271,8 +273,10 @@ void lock_mutex(){
 		fprintf(stderr,"critical mutex error\n");
 		exit(EXIT_FAILURE);
 	}
+	printf("------ SAFE ------\n");
 }
 void unlock_mutex(){
+	printf("------ UNSAFE ------\n");
 	if (pthread_mutex_unlock(&lock)!=0){
 		fprintf(stderr,"critical mutex error\n");
 		exit(EXIT_FAILURE);
