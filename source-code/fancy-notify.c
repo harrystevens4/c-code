@@ -20,7 +20,7 @@ struct audio_notifications{
 	int count;
 };
 volatile int stop = 0; //turned to 1 when ctr-c is sent to stop daemon gracefully
-volatile int stop_count = 0; //number of stop signals received
+volatile int stop_count = 1; //number of stop signals received
 pthread_mutex_t lock;
 
 int force = 0; //from -f flag
