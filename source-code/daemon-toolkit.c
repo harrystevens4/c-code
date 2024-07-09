@@ -1,4 +1,6 @@
 #include <stddef.h>
+#include <limits.h>
+#include <pthread.h>	
 #include <stdio.h>
 #include <errno.h>
 #include <string.h>
@@ -10,6 +12,9 @@
 #include <stdlib.h>
 #define END "END" //end of transmition
 #define ACK "ACK" //acknowledgement signal
+
+pthread_mutex_t tty_lock;
+volatile int STOP = 0;
 
 void free_buffer(struct buffer *buffer){
 	free(buffer->lengths);
@@ -156,8 +161,90 @@ int send_string(int socket,const char *string){
 	}
 	return 0;
 }
+int send_int(int socket, int number){
+	int result;
+	char buffer[4];
+	int string_size = snprintf(NULL,0,"%d",number)+1;//calculate max buffer size
+	printf("max string size %d\n",string_size);
+	char *string = calloc(string_size,sizeof(int));//does null termination for us
+	sprintf(string,"%d",number);
+	for (int i=0;i<string_size-1;i++){
+		sprintf(buffer,"%c",string[i]);
+		result = write(socket,buffer,2);
+		if (result != 0){
+			perror("write");
+			exit(EXIT_FAILURE);
+		}
+		printf("sending %c\n",buffer[i]);
+		result = read(socket,buffer,4);
+		if (result != 0){
+			perror("read");
+			exit(EXIT_FAILURE);
+		}
+		printf("got acknowledgement of %s\n",buffer);
+	}
+	
+	write(socket,END,4);
+	/* cleanup */
+	free(string);
+}
+int receive_int(int socket){
+	int result;
+	int number;
+	char *err;
+	char buffer[4];
+	char *string = malloc(sizeof(char));//does null termination for us
+	for (int i=0;;i++){
+		result = read(socket,buffer,4);
+		if (result != 0){
+			perror("read");
+			exit(EXIT_FAILURE);
+		}
+		if (strncmp(END,buffer,3) == 0){
+			string[i] = '\0';
+			break;
+		}
+		printf("received %c\n",buffer[0]);
+		string = realloc(string,sizeof(char)*(i+2));
+		string[i] = buffer[0];
+		printf("sending acknowledgement\n");
+		result = write(socket,ACK,2);
+		if (result != 0){
+			perror("write");
+			exit(EXIT_FAILURE);
+		}
+	}
+	number = strtol(string,&err,10);
+	/* cleanup */
+	free(string);
+	return number;
+}
+
 int close_named_socket(int socket,const char *filename){
 	close(socket);
 	remove(filename);
 	return 0;
+}
+int lock_tty(){
+	static int init = 0;
+	//attempt to init tty_lock if it hasnt been already
+	if (init == 0){
+		if (pthread_mutex_init(&tty_lock,NULL) != 0){
+			perror("mutex init:");
+			exit(EXIT_FAILURE);
+		}
+		init = 1;
+	}
+	int result = pthread_mutex_lock(&tty_lock);
+	if (result != 0){
+		fprintf(stderr,"Mutex error for tty_lock, could not lock.");
+	}
+	return result;
+}
+int unlock_tty(){
+	int result = pthread_mutex_unlock(&tty_lock);
+	if (result != 0){
+		fprintf(stderr,"Mutex error for tty_lock, could not unlock.");
+	}
+	return result;
 }
