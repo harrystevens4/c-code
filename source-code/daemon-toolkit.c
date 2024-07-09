@@ -98,7 +98,7 @@ int receive_string(int socket,char **string_buffer){
 	const int buffer_size = 4;//we only need to receive END and one char buffers
 	char buffer[buffer_size];
 	int result;
-	*string_buffer = malloc(sizeof(char)*5);
+	*string_buffer = calloc(1,sizeof(char));
 	int index = 0;
 	//printf("using socket %d\n",socket);
 	for (;;){
@@ -108,16 +108,16 @@ int receive_string(int socket,char **string_buffer){
 			exit(EXIT_FAILURE);
 		}
 		if (!(strncmp(buffer,END,strlen(END)))){
-			printf("got end of transmition signal\n");
+			//printf("got end of transmition signal\n");
 			string_buffer[0][index] = '\0';
 			break;
 		}
-		printf("buffer received of %c, updating index %d\n",buffer[0],index);
-		string_buffer[0][index] = buffer[0]; //[0] acts as deference * operator
+		//printf("buffer received of %c, updating index %d\n",buffer[0],index);
+		string_buffer[0][index] = buffer[0]; //string_buffer[0] acts as deference * operator
 		index++;
-		printf("reallocating string_buffer to %d chars\n",index+1);
+		//printf("reallocating string_buffer to %d chars\n",index+1);
 		*string_buffer = realloc(*string_buffer,sizeof(char)*(index+1));
-		printf("current string stands at %s, continuing to build\n",*string_buffer);
+		//printf("current string stands at %s, continuing to build\n",*string_buffer);
 		sprintf(buffer,ACK);
 		//printf("sending acknowledgement of %s\n",buffer);
 		result = write(socket,buffer,4);//standard length for command verbs is 3 chars + \0
@@ -127,7 +127,7 @@ int receive_string(int socket,char **string_buffer){
 		}
 		//printf("acknowledgement sent\n");
 	}
-	printf("completed building string\n");
+	//printf("completed building string\n");
 	return 1;
 }
 int send_string(int socket,const char *string){
@@ -135,20 +135,20 @@ int send_string(int socket,const char *string){
 	int result;
 	for (int index=0;index<strlen(string);index++){
 		sprintf(buffer,"%c",string[index]);
-		printf("sending %c\n",buffer[0]);
+		//printf("sending %c\n",buffer[0]);
 		result = write(socket,buffer,4);
 		if (result<0){
 			perror("write");
 			exit(EXIT_FAILURE);
 		}
-		printf("awaiting acknowledgement\n");
+		//printf("awaiting acknowledgement\n");
 		result = read(socket,buffer,4);
 		if (result<0){
 			perror("read");
 			exit(EXIT_FAILURE);
 		}
 	}	
-	printf("sending end of transmition\n");
+	//printf("sending end of transmition\n");
 	result = write(socket,END,4);
 	if (result<0){
 		perror("write");

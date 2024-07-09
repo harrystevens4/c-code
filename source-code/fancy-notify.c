@@ -224,7 +224,7 @@ void *main_thread(){
 				printf("main_thread: reallocated successfully\n");
 			}
 			printf("main_thread: allocating buffer of size %ld\n",(strlen(audio_notifications.messages[audio_notifications.count-1])+20));
-			buffer = calloc(sizeof(char),(strlen(audio_notifications.messages[audio_notifications.count-1])+40));//redundancy and space for the "spd-say"
+			buffer = calloc(sizeof(char),(strlen(audio_notifications.messages[audio_notifications.count-1])+40));//sudo -u to execute as local user so spd can connect to pulseaudio.
 															     printf("main_thread: allocated buffer to %ld bytes\n",sizeof(char)*(strlen(audio_notifications.messages[audio_notifications.count-1])+20));
 			sprintf(buffer,"sudo -u harry /usr/bin/spd-say -w \"%s\"",audio_notifications.messages[audio_notifications.count-1]);//copy it over so we dont have to hold the lock longer then necesary
 			free(audio_notifications.messages[audio_notifications.count-1]);
@@ -238,6 +238,7 @@ void *main_thread(){
 		pthread_mutex_unlock(&lock);//failsafe
 		//sleep(2); //simulated delay
 	}
+	free(buffer);
 	return NULL;
 }
 void audio_notification(const char *message){
