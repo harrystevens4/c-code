@@ -165,23 +165,23 @@ int send_int(int socket, int number){
 	int result;
 	char buffer[4];
 	int string_size = snprintf(NULL,0,"%d",number)+1;//calculate max buffer size
-	printf("max string size %d\n",string_size);
+	//printf("max string size %d\n",string_size);
 	char *string = calloc(string_size,sizeof(int));//does null termination for us
 	sprintf(string,"%d",number);
 	for (int i=0;i<string_size-1;i++){
 		sprintf(buffer,"%c",string[i]);
+		//printf("sending %c\n",string[i]);
 		result = write(socket,buffer,2);
-		if (result != 0){
+		if (result < 0){
 			perror("write");
 			exit(EXIT_FAILURE);
 		}
-		printf("sending %c\n",buffer[i]);
 		result = read(socket,buffer,4);
-		if (result != 0){
+		if (result < 0){
 			perror("read");
 			exit(EXIT_FAILURE);
 		}
-		printf("got acknowledgement of %s\n",buffer);
+		//printf("got acknowledgement of %s\n",buffer);
 	}
 	
 	write(socket,END,4);
@@ -196,7 +196,7 @@ int receive_int(int socket){
 	char *string = malloc(sizeof(char));//does null termination for us
 	for (int i=0;;i++){
 		result = read(socket,buffer,4);
-		if (result != 0){
+		if (result < 0){
 			perror("read");
 			exit(EXIT_FAILURE);
 		}
@@ -204,12 +204,12 @@ int receive_int(int socket){
 			string[i] = '\0';
 			break;
 		}
-		printf("received %c\n",buffer[0]);
+		//printf("received %c\n",buffer[0]);
 		string = realloc(string,sizeof(char)*(i+2));
 		string[i] = buffer[0];
-		printf("sending acknowledgement\n");
+		//printf("sending acknowledgement\n");
 		result = write(socket,ACK,2);
-		if (result != 0){
+		if (result < 0){
 			perror("write");
 			exit(EXIT_FAILURE);
 		}
