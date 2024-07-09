@@ -112,7 +112,7 @@ int start_daemon(){
 		data_socket = accept(server,NULL,NULL);
 		printf("new connection\n");
 		receive_string(data_socket,&buffer);
-		printf("got new buffer of %s",buffer);
+		printf("got new buffer of %s\n",buffer);
 
 		/* simple notifications */
 		if (strcmp(buffer,SIMPLE) == 0){
@@ -139,7 +139,11 @@ int start_daemon(){
 		/* kill */
 		}else if (strcmp(buffer,KILL) == 0){
 			printf("stopping daemon\n");
+			lock_mutex();
+			printf("setting stop to 1\n");
 			stop = 1;
+			printf("set stop to 1\n");
+			unlock_mutex();
 
 		/* audio notifications */
 		}else if (strcmp(buffer,AUDIO) == 0){//audio notificaitons
@@ -215,10 +219,13 @@ void *main_thread(){
 			//lock_mutex();//start of safety //locked further up
 			printf("main_thread: aquired lock\nnumber of audio notifications: %d\n",audio_notifications.count);
 			if (audio_notifications.count > 1){ //dont realloc to array with 0 elements
-				printf("main_thread: reallocating audio_notifications,messages to %d\n",(int)sizeof(audio_notifications.count-1));
+				printf("main_thread: reallocating audio_notifications.messages to %d\n",(int)(sizeof(char*)*(audio_notifications.count-1)));
 				audio_notifications.messages = realloc(audio_notifications.messages,sizeof(char*)*(audio_notifications.count-1));
+				printf("main_thread: reallocated successfully\n");
 			}
-			buffer = malloc(sizeof(char)*(strlen(audio_notifications.messages[audio_notifications.count-1])+20));//redundancy and space for the "spd-say"
+			printf("main_thread: allocating buffer of size %ld\n",(strlen(audio_notifications.messages[audio_notifications.count-1])+20));
+			buffer = calloc(sizeof(char),(strlen(audio_notifications.messages[audio_notifications.count-1])+40));//redundancy and space for the "spd-say"
+															     printf("main_thread: allocated buffer to %ld bytes\n",sizeof(char)*(strlen(audio_notifications.messages[audio_notifications.count-1])+20));
 			sprintf(buffer,"sudo -u harry /usr/bin/spd-say -w \"%s\"",audio_notifications.messages[audio_notifications.count-1]);//copy it over so we dont have to hold the lock longer then necesary
 			free(audio_notifications.messages[audio_notifications.count-1]);
 			audio_notifications.count--;
