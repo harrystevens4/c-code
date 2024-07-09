@@ -1,4 +1,4 @@
-#include "daemon-core.h"
+#include "daemon-toolkit.h"
 #include <string.h>
 #include <pthread.h>
 #include <signal.h>
@@ -25,7 +25,7 @@ pthread_mutex_t lock;
 
 int force = 0; //from -f flag
 struct simple_notifications simple_notifications;
-struct audio_notifications audio_notifications;
+volatile struct audio_notifications audio_notifications;
 
 void handle_signal(int sig);
 void audio_notification(const char *message);
@@ -108,12 +108,15 @@ int start_daemon(){
 
 	/* mainloop */
 	while (!stop){
+		printf("listening for connections\n");
 		data_socket = accept(server,NULL,NULL);
-		buffer = receive_string(data_socket);
+		printf("new connection\n");
+		receive_string(data_socket,&buffer);
+		printf("got new buffer of %s",buffer);
 
 		/* simple notifications */
 		if (strcmp(buffer,SIMPLE) == 0){
-			buffer = receive_string(data_socket);
+			receive_string(data_socket,&buffer);
 			printf("aquiring simple notification lock\n");
 
 			if (pthread_mutex_lock(&lock)!=0){
@@ -140,14 +143,22 @@ int start_daemon(){
 
 		/* audio notifications */
 		}else if (strcmp(buffer,AUDIO) == 0){//audio notificaitons
-			buffer = receive_string(data_socket);
+			printf("getting audio string");
+			receive_string(data_socket,&buffer);
 			printf("got new audio notification of %s\n",buffer);
 			lock_mutex();//safe zone
+			printf("locked mutex\n");
+			if (audio_notifications.count < 0){
+				fprintf(stdout,"audio notification count below 0\n");
+			}
 			audio_notifications.count++;
-			audio_notifications.messages = realloc(audio_notifications.messages,sizeof(char*)*audio_notifications.count);
+			printf("reallocating audio notifications to %d\n",(int)sizeof(char*)*(audio_notifications.count));
+			audio_notifications.messages = realloc(audio_notifications.messages,sizeof(char*)*(audio_notifications.count));
+			printf("successfully realocated audio notifications\n");
 			audio_notifications.messages[audio_notifications.count-1] = malloc(strlen(buffer)+1);
 			sprintf(audio_notifications.messages[audio_notifications.count-1],"%s",buffer);
 			unlock_mutex();//back to unsafe
+			printf("unlocked mutex\n");
 		}
 		//clean up ready for next connection
 		free(buffer);
@@ -185,7 +196,7 @@ void *main_thread(){
 			//printf("main_thread: processing simple notification...\n");
 			simple_notification_message=simple_notifications.messages[simple_notifications.count-1]; //copy over message so we can release the lock and use a local copy
 			simple_notifications.count--;
-			printf("creating notification %s\n",simple_notification_message);
+			printf("main_thread: creating notification %s\n",simple_notification_message);
 			//printf("main_thread: done\n");
 			//release lock as early as possible
 			if (pthread_mutex_unlock(&lock)!=0){//release lock
@@ -198,19 +209,22 @@ void *main_thread(){
 			system(buffer);
 		}
 		if (audio_notifications.count > 0){
-			printf("new audio notification detected\n");
+			printf("main_thread: new audio notification detected\n");
 			//lock_mutex();//start of safety //locked further up
-			printf("aquired lock\n");
-			if (audio_notifications.count > 2){ //dont realloc to array with 0 elements
-				audio_notifications.messages = realloc(audio_notifications.messages,sizeof(audio_notifications.count-1));
+			printf("main_thread: aquired lock\nnumber of audio notifications: %d\n",audio_notifications.count);
+			if (audio_notifications.count > 1){ //dont realloc to array with 0 elements
+				printf("main_thread: reallocating audio_notifications,messages to %d\n",(int)sizeof(audio_notifications.count-1));
+				audio_notifications.messages = realloc(audio_notifications.messages,sizeof(char*)*(audio_notifications.count-1));
 			}
 			buffer = malloc(sizeof(char)*(strlen(audio_notifications.messages[audio_notifications.count-1])+20));//redundancy and space for the "spd-say"
 			sprintf(buffer,"sudo -u harry /usr/bin/spd-say -w \"%s\"",audio_notifications.messages[audio_notifications.count-1]);//copy it over so we dont have to hold the lock longer then necesary
 			free(audio_notifications.messages[audio_notifications.count-1]);
 			audio_notifications.count--;
 			unlock_mutex();//move to unsafe
-			fprintf(stdout,"in main_thread with audio notification with message %s\n",buffer);
+			printf("main_thread: released lock, sending audio\n");
 			system(buffer);// equivalent to spd-say "$message"
+			printf("main_thread: sent audio\n");
+			sleep(1);
 		}
 		pthread_mutex_unlock(&lock);//failsafe
 		//sleep(2); //simulated delay
