@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <dirent.h>
 #include <sys/stat.h>
 #include <string.h>
 #include <stdlib.h>
@@ -25,6 +26,7 @@ int client_send_mail();
 void client_view_mail();
 int start_daemon();
 int dump_mail();
+int load_mail();
 
 int main(int argc, char *argv[]){
 	struct args args;
@@ -36,6 +38,24 @@ int main(int argc, char *argv[]){
 	}
 	return 0;
 }
+int load_mail(){
+	printf("attempting to load mail...\n");
+
+	/* get a list of the mail files */
+	DIR *directory;
+	struct dirent *dir;
+	directory = opendir(MAIL_LOCATION);
+	if (directory){
+		while ((dir = readdir(directory)) != NULL){
+			printf("loading mail file %s\n", dir->d_name);
+		}
+		closedir(directory);
+	}
+	printf("mail loaded\n");
+	return 0;
+}
+
+
 int dump_mail(){
 	/* check mail directory exists, and if not , create it */
 	struct stat sb;
@@ -74,6 +94,12 @@ int dump_mail(){
 int start_daemon(){
 	pthread_mutex_init(&lock,NULL);
 	pthread_t thread_id;
+	
+	/* load any mail stored in the mail files */
+	if (load_mail() != 0){
+		fprintf(stderr,"could not load mail\n");
+	}
+
 	int data_socket;
 	char *buffer;
 	char *header;
