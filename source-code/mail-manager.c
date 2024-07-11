@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <sys/stat.h>
 #include <string.h>
 #include <stdlib.h>
 #include <sys/socket.h>
@@ -7,6 +8,7 @@
 #include "args.h"
 #include "daemon-toolkit.h"
 #define SOCKET_FD "/tmp/mail-manager.socket"
+#define MAIL_LOCATION "/var/spool/mail/system"
 
 struct mail{
 	char **header;
@@ -22,6 +24,7 @@ void daemon_receive_mail(int socket);
 int client_send_mail();
 void client_view_mail();
 int start_daemon();
+int dump_mail();
 
 int main(int argc, char *argv[]){
 	struct args args;
@@ -30,6 +33,41 @@ int main(int argc, char *argv[]){
 		if (args.single[i] == 'd'){
 			return start_daemon();
 		}
+	}
+	return 0;
+}
+int dump_mail(){
+	/* check mail directory exists, and if not , create it */
+	struct stat sb;
+	if (! (stat(MAIL_LOCATION, &sb) == 0 && S_ISDIR(sb.st_mode))){
+		if (mkdir(MAIL_LOCATION, 0777) != 0){
+			fprintf(stderr,"could not create folder for mail storage\n");
+			return 1;
+		}
+	}
+	/* dump each mail into its respective file */
+	char filepath[20];
+	FILE* mail_file;
+	if (pthread_mutex_lock(&lock) != 0){
+		fprintf(stderr,"could not lock mutex\n");
+		exit(EXIT_FAILURE);
+	}
+	for (int i=0;i<mail.count;i++){
+		/* name mails after their index */
+		sprintf(filepath,"%d",i);
+		mail_file = fopen((const char *)filepath,"w");
+		if (mail_file == NULL){
+			fprintf(stderr,"could not open file %s\n",filepath);
+			return 1;
+		}
+		/* header and body are seperated by newline character */
+		fprintf(mail_file,"%s\n%s",mail.header[i],mail.body[i]);
+		//cleanup after each file
+		fclose(mail_file);
+	}
+	if (pthread_mutex_unlock(&lock) != 0){
+		fprintf(stderr,"could not unlock mutex\n");
+		exit(EXIT_FAILURE);
 	}
 	return 0;
 }
@@ -65,7 +103,8 @@ int start_daemon(){
 	pthread_mutex_unlock(&lock);
 	pthread_mutex_destroy(&lock);
 	close_named_socket(server,SOCKET_FD);
-	return 0;
+	/* dump any unread mails into a file */
+	return dump_mail();
 }
 void *daemon_view_mail(){
 	while (!stop){
@@ -88,10 +127,10 @@ void client_view_mail(){
 }
 void daemon_receive_mail(int socket){
 	char *header;
-	char *body
-	receive_string(socket,header);
+	char *body;
+	receive_string(socket,&header);
 	printf("got header of %s\n",header);
-	receive_string(socket,body);
+	receive_string(socket,&body);
 	printf("got body of %s\n",body);
 	/* guaranteed atomicity of all operations */
 	if (pthread_mutex_lock(&lock)<0){
@@ -100,8 +139,11 @@ void daemon_receive_mail(int socket){
 	}
 	mail.count++;
 	mail.header = realloc(mail.header,sizeof(char*)*(mail.count));
-	mail.header[count-1] = malloc(sizeof(char)*(strlen(header)+1));
+	mail.header[mail.count-1] = malloc(sizeof(char)*(strlen(header)+1));
 	strcpy(mail.header[-1],header);
+	mail.body = realloc(mail.body,sizeof(char*)*(mail.count));
+	mail.body[mail.count-1] = malloc(sizeof(char)*(strlen(body)+1));
+	strcpy(mail.body[-1],body);
 	if (pthread_mutex_unlock(&lock)<0){
 		fprintf(stderr,"start_daemon: mutex failed to unlock\n");
 		exit(EXIT_FAILURE);
