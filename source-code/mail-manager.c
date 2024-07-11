@@ -10,6 +10,7 @@
 #include "daemon-toolkit.h"
 #define SOCKET_FD "/tmp/mail-manager.socket"
 #define MAIL_LOCATION "/var/spool/mail/system"
+#define ERROR "------ ERROR ------\n"
 
 struct mail{
 	char **header;
@@ -18,6 +19,7 @@ struct mail{
 };
 
 struct mail mail;
+mail.count = 0;
 static volatile int stop = 1;
 pthread_mutex_t lock;
 void *daemon_view_mail();
@@ -42,12 +44,28 @@ int load_mail(){
 	printf("attempting to load mail...\n");
 
 	/* get a list of the mail files */
+	FILE *mail_file;
 	DIR *directory;
 	struct dirent *dir;
 	directory = opendir(MAIL_LOCATION);
 	if (directory){
 		while ((dir = readdir(directory)) != NULL){
-			printf("loading mail file %s\n", dir->d_name);
+			if (dir->d_type == DT_REG){//make sure it is a file
+				printf("loading mail file %s\n", dir->d_name);
+				/* loading mail into memory */
+				if (pthread_lock_mutex(&lock) != 0){
+					fprintf(stderr,ERROR"mutex locking error in load_mail()\n"ERROR);
+					return 1;
+				}
+				mail_file = fopen(dir->d_name,"r");
+				mail.header[mail.count] = realloc();
+				fclose(mail_file);
+				mail.count++;
+				if (pthread_unlock_mutex(&lock) != 0){
+					fprintf(stderr,ERROR"mutex unlocking error in load_mail()\n"ERROR);
+					return 1;
+				}
+			}
 		}
 		closedir(directory);
 	}
@@ -55,13 +73,13 @@ int load_mail(){
 	return 0;
 }
 
-
 int dump_mail(){
+	printf("dumping mail...\n");
 	/* check mail directory exists, and if not , create it */
 	struct stat sb;
 	if (! (stat(MAIL_LOCATION, &sb) == 0 && S_ISDIR(sb.st_mode))){
 		if (mkdir(MAIL_LOCATION, 0777) != 0){
-			fprintf(stderr,"could not create folder for mail storage\n");
+			fprintf(stderr,ERROR"could not create folder for mail storage\n"ERROR);
 			return 1;
 		}
 	}
@@ -69,7 +87,7 @@ int dump_mail(){
 	char filepath[20];
 	FILE* mail_file;
 	if (pthread_mutex_lock(&lock) != 0){
-		fprintf(stderr,"could not lock mutex\n");
+		fprintf(stderr,ERROR"could not lock mutex\n"ERROR);
 		exit(EXIT_FAILURE);
 	}
 	for (int i=0;i<mail.count;i++){
@@ -77,7 +95,7 @@ int dump_mail(){
 		sprintf(filepath,"%d",i);
 		mail_file = fopen((const char *)filepath,"w");
 		if (mail_file == NULL){
-			fprintf(stderr,"could not open file %s\n",filepath);
+			fprintf(stderr,ERROR"could not open file %s\n"ERROR,filepath);
 			return 1;
 		}
 		/* header and body are seperated by newline character */
@@ -89,6 +107,7 @@ int dump_mail(){
 		fprintf(stderr,"could not unlock mutex\n");
 		exit(EXIT_FAILURE);
 	}
+	printf("mail dumped\n");
 	return 0;
 }
 int start_daemon(){
@@ -101,10 +120,14 @@ int start_daemon(){
 	}
 
 	int data_socket;
+	int result = 0;
 	char *buffer;
 	char *header;
 	char *body;
 	int server = make_named_socket(SOCKET_FD);
+	if (server < 0){
+		fprintf(stderr,"could not create the server socket\n");
+	}
 	listen(server,10);
 	while (!stop){
 		data_socket = accept(server,NULL,NULL);
@@ -127,10 +150,11 @@ int start_daemon(){
 	free(mail.header);
 	free(mail.body);
 	pthread_mutex_unlock(&lock);
-	pthread_mutex_destroy(&lock);
 	close_named_socket(server,SOCKET_FD);
 	/* dump any unread mails into a file */
-	return dump_mail();
+	result = dump_mail();
+	pthread_mutex_destroy(&lock);
+	return result;
 }
 void *daemon_view_mail(){
 	while (!stop){
