@@ -66,18 +66,18 @@ int load_mail(){
 					fprintf(stderr,ERROR"could not open file\n"ERROR);
 					return 1;
 				}
-				printf("reallocating header and body...\n");
+				//printf("reallocating header and body...\n");
 				mail.header = realloc(mail.header,sizeof(char*)*(mail.count+1));
 				mail.body = realloc(mail.body,sizeof(char*)*(mail.count+1));
-				printf("allocating header and body %d..\n",mail.count);
+				//printf("allocating header and body %d..\n",mail.count);
 				mail.header[mail.count] = malloc(sizeof(char));
 				mail.body[mail.count] = malloc(sizeof(char));
 				for (i = 0;;i++){
-					printf("reallocating mail header %d...\n",mail.count);
+					//printf("reallocating mail header %d...\n",mail.count);
 					mail.header[mail.count] = realloc(mail.header[mail.count],sizeof(char)*(i+1));
-					printf("getting character...\n");
+					//printf("getting character...\n");
 					buffer = fgetc(mail_file);
-					printf("got char of %c\n",buffer);
+					//printf("got char of %c\n",buffer);
 					if (feof(mail_file)){
 						fprintf(stderr,ERROR"expected newline but got end of file. possible mail corruption\n"ERROR);
 						return 1;
@@ -89,15 +89,15 @@ int load_mail(){
 						break;
 					}
 				}
-				printf("allocating body %d...\n",mail.count);
+				//printf("allocating body %d...\n",mail.count);
 				mail.body[mail.count] = malloc(sizeof(char));
 				for (i=0;;i++){
-					printf("reallocating mail body...\n");
+					//printf("reallocating mail body...\n");
 					mail.body = realloc(mail.body,sizeof(char*)*(mail.count+1));
 					buffer = fgetc(mail_file);
-					printf("got %c\n",buffer);
+					//printf("got %c\n",buffer);
 					if (feof(mail_file)){
-						printf("reached end of file\n");
+						//printf("reached end of file\n");
 						mail.body[mail.count][i] = '\0';
 						break;
 					}
@@ -192,7 +192,7 @@ int start_daemon(){
 	}
 
 	/* dump any unread mails into a file */
-	//result = dump_mail();
+	result = dump_mail();
 
 	/* cleanup */
 	pthread_mutex_lock(&lock);//extra safety if the threads havent finnished yet
