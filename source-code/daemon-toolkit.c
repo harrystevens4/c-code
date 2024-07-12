@@ -5,6 +5,7 @@
 #include <errno.h>
 #include <string.h>
 #include <sys/socket.h>
+#include <sys/stat.h>
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/un.h>
@@ -59,6 +60,10 @@ int make_named_socket (const char *filename){
       perror ("bind");
       exit (EXIT_FAILURE);
     }
+  if (chmod(filename,strtol("1777", 0, 8)) != 0){
+	  fprintf(stderr,"Could not make socket accesable for all users.\n");
+  }
+
 
   return sock;
 }
