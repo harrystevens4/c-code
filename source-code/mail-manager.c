@@ -38,7 +38,7 @@ int main(int argc, char *argv[]){
 		if (args.single[i] == 'd'){
 			return start_daemon();
 		}
-		if (args.single[i] == 'd'){
+		if (args.single[i] == 'k'){
 			kill_daemon();
 		}
 	}
@@ -132,7 +132,7 @@ int dump_mail(){
 	/* check mail directory exists, and if not , create it */
 	struct stat sb;
 	if (! (stat(MAIL_LOCATION, &sb) == 0 && S_ISDIR(sb.st_mode))){
-		if (mkdir(MAIL_LOCATION, 0777) != 0){
+		if (mkdir(MAIL_LOCATION, 1777) != 0){
 			fprintf(stderr,ERROR"could not create folder for mail storage\n"ERROR);
 			return 1;
 		}
@@ -149,7 +149,8 @@ int dump_mail(){
 		sprintf(filepath,"%s/%d",MAIL_LOCATION,i);
 		mail_file = fopen((const char *)filepath,"w");
 		if (mail_file == NULL){
-			fprintf(stderr,ERROR"could not open file %s\n"ERROR,filepath);
+			fprintf(stderr,ERROR"could not open file %s. May be due to lack of permition\n"ERROR,filepath);
+			pthread_mutex_unlock(&lock);
 			return 1;
 		}
 		/* header and body are seperated by newline character */
@@ -302,6 +303,8 @@ int client_send_mail(struct args args){
 	return 0;
 }
 void kill_daemon(){
+	printf("killing daemon...\n");
 	int socket = connect_named_socket(SOCKET_FD);
 	send_string(socket,"kill");
+	printf("kill signal sent\n");
 }
