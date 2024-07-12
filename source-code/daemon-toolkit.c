@@ -192,6 +192,7 @@ int send_int(int socket, int number){
 	write(socket,END,4);
 	/* cleanup */
 	free(string);
+	return 0;
 }
 int receive_int(int socket){
 	int result;
