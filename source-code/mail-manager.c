@@ -19,7 +19,7 @@ struct mail{
 };
 
 struct mail mail;
-static volatile int stop = 1;
+static volatile int stop = 0;
 pthread_mutex_t lock;
 void *daemon_view_mail();
 void daemon_receive_mail(int socket);
@@ -28,6 +28,7 @@ void client_view_mail();
 int start_daemon();
 int dump_mail();
 int load_mail();
+void kill_daemon();
 
 int main(int argc, char *argv[]){
 
@@ -36,6 +37,9 @@ int main(int argc, char *argv[]){
 	for (int i = 0;i<args.number_single;i++){
 		if (args.single[i] == 'd'){
 			return start_daemon();
+		}
+		if (args.single[i] == 'd'){
+			kill_daemon();
 		}
 	}
 	if(args.number_single == 0){
@@ -134,7 +138,7 @@ int dump_mail(){
 		}
 	}
 	/* dump each mail into its respective file */
-	char filepath[20];
+	char filepath[180];
 	FILE* mail_file;
 	if (pthread_mutex_lock(&lock) != 0){
 		fprintf(stderr,ERROR"could not lock mutex\n"ERROR);
@@ -142,7 +146,7 @@ int dump_mail(){
 	}
 	for (int i=0;i<mail.count;i++){
 		/* name mails after their index */
-		sprintf(filepath,"%d",i);
+		sprintf(filepath,"%s/%d",MAIL_LOCATION,i);
 		mail_file = fopen((const char *)filepath,"w");
 		if (mail_file == NULL){
 			fprintf(stderr,ERROR"could not open file %s\n"ERROR,filepath);
@@ -250,20 +254,25 @@ void daemon_receive_mail(int socket){
 		fprintf(stderr,"start_daemon: mutex failed to lock\n");
 		exit(EXIT_FAILURE);
 	}
+	printf("incrementing mail count...\n");
 	mail.count++;
+	printf("copying header...\n");
 	mail.header = realloc(mail.header,sizeof(char*)*(mail.count));
 	mail.header[mail.count-1] = malloc(sizeof(char)*(strlen(header)+1));
-	strcpy(mail.header[-1],header);
+	strcpy(mail.header[mail.count-1],header);
+	printf("copying body...\n");
 	mail.body = realloc(mail.body,sizeof(char*)*(mail.count));
 	mail.body[mail.count-1] = malloc(sizeof(char)*(strlen(body)+1));
-	strcpy(mail.body[-1],body);
+	strcpy(mail.body[mail.count-1],body);
 	if (pthread_mutex_unlock(&lock)<0){
 		fprintf(stderr,"start_daemon: mutex failed to unlock\n");
 		exit(EXIT_FAILURE);
 	}
 	/* allow other threads to use hardware after this point */
+	printf("cleaning up...\n");
 	free(header);//cleanup
 	free(body);
+	printf("successfully got new mail!\n");
 }
 int client_send_mail(struct args args){
 	if (args.number_other != 2){
@@ -291,4 +300,8 @@ int client_send_mail(struct args args){
 	free(body);
 	printf("mail sent!\n");
 	return 0;
+}
+void kill_daemon(){
+	int socket = connect_named_socket(SOCKET_FD);
+	send_string(socket,"kill");
 }
