@@ -31,22 +31,24 @@ int load_mail();
 void kill_daemon();
 
 int main(int argc, char *argv[]){
-
+	int result = 0;
 	struct args args;
 	parse_args(argc,argv,&args);
 	for (int i = 0;i<args.number_single;i++){
 		if (args.single[i] == 'd'){
-			return start_daemon();
+			result = start_daemon();
+			break;
 		}
 		if (args.single[i] == 'k'){
 			kill_daemon();
+			break;
 		}
 	}
 	if(args.number_single == 0){
-		return client_send_mail(args);
+		result = client_send_mail(args);
 	}
 	free_args(&args);
-	return 0;
+	return result;
 }
 int load_mail(){
 	printf("attempting to load mail...\n");
@@ -74,18 +76,18 @@ int load_mail(){
 					fprintf(stderr,ERROR"could not open file\n"ERROR);
 					return 1;
 				}
-				//printf("reallocating header and body...\n");
+				printf("reallocating header and body...\n");
 				mail.header = realloc(mail.header,sizeof(char*)*(mail.count+1));
 				mail.body = realloc(mail.body,sizeof(char*)*(mail.count+1));
-				//printf("allocating header and body %d..\n",mail.count);
+				printf("allocating header and body %d..\n",mail.count);
 				mail.header[mail.count] = malloc(sizeof(char));
 				mail.body[mail.count] = malloc(sizeof(char));
 				for (i = 0;;i++){
-					//printf("reallocating mail header %d...\n",mail.count);
+					printf("reallocating mail header %d...\n",mail.count);
 					mail.header[mail.count] = realloc(mail.header[mail.count],sizeof(char)*(i+1));
-					//printf("getting character...\n");
+					printf("getting character...\n");
 					buffer = fgetc(mail_file);
-					//printf("got char of %c\n",buffer);
+					printf("got char of %c\n",buffer);
 					if (feof(mail_file)){
 						fprintf(stderr,ERROR"expected newline but got end of file. possible mail corruption\n"ERROR);
 						return 1;
@@ -97,21 +99,23 @@ int load_mail(){
 						break;
 					}
 				}
-				//printf("allocating body %d...\n",mail.count);
+				printf("allocating body %d...\n",mail.count);
 				mail.body[mail.count] = malloc(sizeof(char));
 				for (i=0;;i++){
-					//printf("reallocating mail body...\n");
-					mail.body = realloc(mail.body,sizeof(char*)*(mail.count+1));
 					buffer = fgetc(mail_file);
-					//printf("got %c\n",buffer);
+					printf("got %c\n",buffer);
 					if (feof(mail_file)){
-						//printf("reached end of file\n");
+						printf("reached end of file\n");
 						mail.body[mail.count][i] = '\0';
 						break;
 					}
+					printf("reallocating mail body...\n");
+					mail.body[mail.count] = realloc(mail.body[mail.count],sizeof(char)*(i+2));
 					mail.body[mail.count][i] = buffer;
 				}
+				printf("closing file...\n");
 				fclose(mail_file);
+				printf("closed\n");
 				mail.count++;
 				printf("mail count now %d\n",mail.count);
 				printf("--- header ---\n%s\n--- body ---\n%s",mail.header[mail.count-1],mail.body[mail.count-1]);
