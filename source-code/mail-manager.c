@@ -23,7 +23,7 @@ static volatile int stop = 1;
 pthread_mutex_t lock;
 void *daemon_view_mail();
 void daemon_receive_mail(int socket);
-int client_send_mail();
+int client_send_mail(struct args args);
 void client_view_mail();
 int start_daemon();
 int dump_mail();
@@ -38,6 +38,10 @@ int main(int argc, char *argv[]){
 			return start_daemon();
 		}
 	}
+	if(args.number_single == 0){
+		return client_send_mail(args);
+	}
+	free_args(&args);
 	return 0;
 }
 int load_mail(){
@@ -184,8 +188,10 @@ int start_daemon(){
 		receive_string(data_socket,&buffer);
 		if (strcmp(buffer,"view") == 0){
 			pthread_create(&thread_id,NULL,daemon_view_mail,(void *)(long)data_socket); //break of a seperate thread to deal with that
-		}else if (strcmp(buffer,"send")){
+		}else if (strcmp(buffer,"send") == 0){
 			daemon_receive_mail(data_socket);
+		}else if (strcmp(buffer,"kill") == 0){
+			stop = 1;
 		}
 		/* clean up connection */
 		close(data_socket);
@@ -256,7 +262,33 @@ void daemon_receive_mail(int socket){
 		exit(EXIT_FAILURE);
 	}
 	/* allow other threads to use hardware after this point */
+	free(header);//cleanup
+	free(body);
 }
-int client_send_mail(){
+int client_send_mail(struct args args){
+	if (args.number_other != 2){
+		fprintf(stderr,"Expected 2 arguments of [header] and [body], but got %d\n",args.number_other);
+		return 1;
+	}
+	printf("collecting mail from command line args...\n");
+	int socket;
+	char *header;
+	char *body;
+	printf("allocating space...\n");
+	header = malloc(sizeof(char)*(strlen(args.other[0])+1));
+	body = malloc(sizeof(char)*(strlen(args.other[1])+1));
+	printf("copying args...\n");
+	strcpy(header,args.other[0]);
+	strcpy(body,args.other[1]);
+	printf("connecting to daemon...\n");
+	socket = connect_named_socket(SOCKET_FD);
+	printf("sending data...\n");
+	send_string(socket,"send");
+	send_string(socket,(const char *)header);
+	send_string(socket,(const char *)body);
+	printf("freeing allocated memory...\n");
+	free(header);
+	free(body);
+	printf("mail sent!\n");
 	return 0;
 }
