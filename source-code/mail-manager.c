@@ -154,7 +154,7 @@ int dump_mail(){
 			return 1;
 		}
 		/* header and body are seperated by newline character */
-		fprintf(mail_file,"%s\n%s\n",mail.header[i],mail.body[i]);
+		fprintf(mail_file,"%s\n%s",mail.header[i],mail.body[i]);
 		//cleanup after each file
 		fclose(mail_file);
 	}
@@ -286,10 +286,10 @@ int client_send_mail(struct args args){
 	char *body;
 	printf("allocating space...\n");
 	header = malloc(sizeof(char)*(strlen(args.other[0])+1));
-	body = malloc(sizeof(char)*(strlen(args.other[1])+1));
+	body = malloc(sizeof(char)*(strlen(args.other[1])+2));
 	printf("copying args...\n");
 	strcpy(header,args.other[0]);
-	strcpy(body,args.other[1]);
+	sprintf(body,"%s\n",args.other[1]);
 	printf("connecting to daemon...\n");
 	socket = connect_named_socket(SOCKET_FD);
 	printf("sending data...\n");
