@@ -64,7 +64,7 @@ int load_mail(){
 	if (directory){
 		while ((dir = readdir(directory)) != NULL){
 			if (dir->d_type == DT_REG){//make sure it is a file
-				printf("loading mail file %s\n", dir->d_name);
+				//printf("loading mail file %s\n", dir->d_name);
 				/* loading mail into memory */
 				if (pthread_mutex_lock(&lock) != 0){
 					fprintf(stderr,ERROR"mutex locking error in load_mail()\n"ERROR);
@@ -76,18 +76,18 @@ int load_mail(){
 					fprintf(stderr,ERROR"could not open file\n"ERROR);
 					return 1;
 				}
-				printf("reallocating header and body...\n");
+				//printf("reallocating header and body...\n");
 				mail.header = realloc(mail.header,sizeof(char*)*(mail.count+1));
 				mail.body = realloc(mail.body,sizeof(char*)*(mail.count+1));
-				printf("allocating header and body %d..\n",mail.count);
+				//printf("allocating header and body %d..\n",mail.count);
 				mail.header[mail.count] = malloc(sizeof(char));
 				mail.body[mail.count] = malloc(sizeof(char));
 				for (i = 0;;i++){
-					printf("reallocating mail header %d...\n",mail.count);
+					//printf("reallocating mail header %d...\n",mail.count);
 					mail.header[mail.count] = realloc(mail.header[mail.count],sizeof(char)*(i+1));
-					printf("getting character...\n");
+					//printf("getting character...\n");
 					buffer = fgetc(mail_file);
-					printf("got char of %c\n",buffer);
+					//printf("got char of %c\n",buffer);
 					if (feof(mail_file)){
 						fprintf(stderr,ERROR"expected newline but got end of file. possible mail corruption\n"ERROR);
 						return 1;
@@ -99,26 +99,26 @@ int load_mail(){
 						break;
 					}
 				}
-				printf("allocating body %d...\n",mail.count);
+				//printf("allocating body %d...\n",mail.count);
 				mail.body[mail.count] = malloc(sizeof(char));
 				for (i=0;;i++){
 					buffer = fgetc(mail_file);
-					printf("got %c\n",buffer);
+					//printf("got %c\n",buffer);
 					if (feof(mail_file)){
-						printf("reached end of file\n");
+						//printf("reached end of file\n");
 						mail.body[mail.count][i] = '\0';
 						break;
 					}
-					printf("reallocating mail body...\n");
+					//printf("reallocating mail body...\n");
 					mail.body[mail.count] = realloc(mail.body[mail.count],sizeof(char)*(i+2));
 					mail.body[mail.count][i] = buffer;
 				}
-				printf("closing file...\n");
+				//printf("closing file...\n");
 				fclose(mail_file);
-				printf("closed\n");
+				//printf("closed\n");
 				mail.count++;
-				printf("mail count now %d\n",mail.count);
-				printf("--- header ---\n%s\n--- body ---\n%s",mail.header[mail.count-1],mail.body[mail.count-1]);
+				//printf("mail count now %d\n",mail.count);
+				//printf("	[header]\n	%s\n	[body]\n	%s	[end]\n",mail.header[mail.count-1],mail.body[mail.count-1]);
 				if (pthread_mutex_unlock(&lock) != 0){
 					fprintf(stderr,ERROR"mutex unlocking error in load_mail()\n"ERROR);
 					return 1;
@@ -185,8 +185,6 @@ int start_daemon(){
 	int data_socket;
 	int result = 0;
 	char *buffer;
-	char *header;
-	char *body;
 	int server = make_named_socket(SOCKET_FD);
 	if (server < 0){
 		fprintf(stderr,"could not create the server socket\n");
@@ -196,9 +194,11 @@ int start_daemon(){
 		data_socket = accept(server,NULL,NULL);
 		receive_string(data_socket,&buffer);
 		if (strcmp(buffer,"view") == 0){
+			free(buffer);
 			pthread_create(&thread_id,NULL,daemon_view_mail,(void *)(long)data_socket); //break of a seperate thread to deal with that
 		}else if (strcmp(buffer,"send") == 0){
 			daemon_receive_mail(data_socket);
+			free(buffer);
 		}else if (strcmp(buffer,"kill") == 0){
 			stop = 1;
 		}
@@ -213,14 +213,15 @@ int start_daemon(){
 	pthread_mutex_lock(&lock);//extra safety if the threads havent finnished yet
 	printf("cleaning up %d mails...\n",mail.count);
 	for (int i=0;i<mail.count;i++){
-		printf("freeing mail header %d\n",i);
+		//printf("freeing mail header %d\n",i);
 		free(mail.header[i]);
-		printf("freeing mail body %d\n",i);
+		//printf("freeing mail body %d\n",i);
 		free(mail.body[i]);
 	}
-	printf("freeing structs...\n");
+	//printf("freeing structs...\n");
 	free(mail.header);
 	free(mail.body);
+	free(buffer); //allocated by receive_string()
 	printf("closing socket...\n");
 	pthread_mutex_unlock(&lock);
 	close_named_socket(server,SOCKET_FD);
@@ -229,22 +230,66 @@ int start_daemon(){
 	return result;
 }
 void *daemon_view_mail(){
+	char *buffer;
+	int selected;
+	if (pthread_mutex_lock(&lock)<0){
+		fprintf(stderr,"start_daemon: mutex failed to lock\n");
+		exit(EXIT_FAILURE);
+	}
+	send_int(data_socket,mail.count);// start communication by specifying the number of mails
+	if (pthread_mutex_unlock(&lock)<0){
+		fprintf(stderr,"start_daemon: mutex failed to unlock\n");
+		exit(EXIT_FAILURE);
+	}
 	while (!stop){
+		receive_string(data_socket,&buffer);//check if more mails are wanted or finnished
+		selected = receive_int(data_socket);
+		if (strcmp(buffer,"done") == 0){
+			break;
+		}
 		/* guaranteed atomicity of all operations */
 		if (pthread_mutex_lock(&lock)<0){
 			fprintf(stderr,"start_daemon: mutex failed to lock\n");
 			exit(EXIT_FAILURE);
 		}
+		send_string(data_socket,(const char *)mail.header[selected]);
+		send_string(data_socket,(const char *)mail.body[selected]);
 		if (pthread_mutex_unlock(&lock)<0){
 			fprintf(stderr,"start_daemon: mutex failed to unlock\n");
 			exit(EXIT_FAILURE);
 		}
 		/* allow other threads to use hardware after this point */
 	}
+	free(buffer);
 	return NULL;
 }
 void client_view_mail(){
+	char *header;
+	char *body;
+	int mail_count;
 	int data_socket = connect_named_socket(SOCKET_FD);
+	send_string(data_socket,"view");//tell daemon we want to view mails
+	mail_count = receive_int(data_socket);//get number of mails
+	for (int i=0;i<mail_count;i++){
+		send_string(data_socket,"more");
+		send_int(data_socket,i);//request each mail in order
+
+		/* get mail contents */
+		receive_string(data_socket,&header);
+		receive_string(data_socket,&body);
+		
+		/* display mail */
+		printf("+---+ Mail %d +----+\n",i);
+		printf("%s\n",header);
+		printf("+---+ Contents +---+\n");
+		printf("%s",body);
+		printf("+------------------+\n");
+
+		/* cleanup after displaying each mail */
+		free(header);
+		free(body);
+	}
+	send_string(data_socket,"done");//signal that we are done getting mails
 	close(data_socket);
 }
 void daemon_receive_mail(int socket){
