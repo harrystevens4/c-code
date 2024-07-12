@@ -154,7 +154,7 @@ int dump_mail(){
 			return 1;
 		}
 		/* header and body are seperated by newline character */
-		fprintf(mail_file,"%s\n%s",mail.header[i],mail.body[i]);
+		fprintf(mail_file,"%s\n%s\n",mail.header[i],mail.body[i]);
 		//cleanup after each file
 		fclose(mail_file);
 	}
