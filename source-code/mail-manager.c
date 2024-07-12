@@ -19,7 +19,6 @@ struct mail{
 };
 
 struct mail mail;
-mail.count = 0;
 static volatile int stop = 1;
 pthread_mutex_t lock;
 void *daemon_view_mail();
@@ -31,6 +30,7 @@ int dump_mail();
 int load_mail();
 
 int main(int argc, char *argv[]){
+
 	struct args args;
 	parse_args(argc,argv,&args);
 	for (int i = 0;i<args.number_single;i++){
@@ -42,6 +42,9 @@ int main(int argc, char *argv[]){
 }
 int load_mail(){
 	printf("attempting to load mail...\n");
+	int i;
+	char buffer;
+	char mail_file_path[280];
 
 	/* get a list of the mail files */
 	FILE *mail_file;
@@ -53,15 +56,58 @@ int load_mail(){
 			if (dir->d_type == DT_REG){//make sure it is a file
 				printf("loading mail file %s\n", dir->d_name);
 				/* loading mail into memory */
-				if (pthread_lock_mutex(&lock) != 0){
+				if (pthread_mutex_lock(&lock) != 0){
 					fprintf(stderr,ERROR"mutex locking error in load_mail()\n"ERROR);
 					return 1;
 				}
-				mail_file = fopen(dir->d_name,"r");
-				mail.header[mail.count] = realloc();
+				sprintf(mail_file_path,"%s/%s",MAIL_LOCATION,dir->d_name);
+				mail_file = fopen(mail_file_path,"r");
+				if (mail_file == NULL){
+					fprintf(stderr,ERROR"could not open file\n"ERROR);
+					return 1;
+				}
+				printf("reallocating header and body...\n");
+				mail.header = realloc(mail.header,sizeof(char*)*(mail.count+1));
+				mail.body = realloc(mail.body,sizeof(char*)*(mail.count+1));
+				printf("allocating header and body %d..\n",mail.count);
+				mail.header[mail.count] = malloc(sizeof(char));
+				mail.body[mail.count] = malloc(sizeof(char));
+				for (i = 0;;i++){
+					printf("reallocating mail header %d...\n",mail.count);
+					mail.header[mail.count] = realloc(mail.header[mail.count],sizeof(char)*(i+1));
+					printf("getting character...\n");
+					buffer = fgetc(mail_file);
+					printf("got char of %c\n",buffer);
+					if (feof(mail_file)){
+						fprintf(stderr,ERROR"expected newline but got end of file. possible mail corruption\n"ERROR);
+						return 1;
+					}
+					if (buffer != '\n'){
+						mail.header[mail.count][i] = buffer;
+					}else{
+						mail.header[mail.count][i] = '\0';
+						break;
+					}
+				}
+				printf("allocating body %d...\n",mail.count);
+				mail.body[mail.count] = malloc(sizeof(char));
+				for (i=0;;i++){
+					printf("reallocating mail body...\n");
+					mail.body = realloc(mail.body,sizeof(char*)*(mail.count+1));
+					buffer = fgetc(mail_file);
+					printf("got %c\n",buffer);
+					if (feof(mail_file)){
+						printf("reached end of file\n");
+						mail.body[mail.count][i] = '\0';
+						break;
+					}
+					mail.body[mail.count][i] = buffer;
+				}
 				fclose(mail_file);
 				mail.count++;
-				if (pthread_unlock_mutex(&lock) != 0){
+				printf("mail count now %d\n",mail.count);
+				printf("--- header ---\n%s\n--- body ---\n%s",mail.header[mail.count-1],mail.body[mail.count-1]);
+				if (pthread_mutex_unlock(&lock) != 0){
 					fprintf(stderr,ERROR"mutex unlocking error in load_mail()\n"ERROR);
 					return 1;
 				}
@@ -111,12 +157,16 @@ int dump_mail(){
 	return 0;
 }
 int start_daemon(){
+	mail.count = 0;
+	mail.header = malloc(sizeof(char*));
+	mail.body = malloc(sizeof(char*));
 	pthread_mutex_init(&lock,NULL);
 	pthread_t thread_id;
 	
 	/* load any mail stored in the mail files */
 	if (load_mail() != 0){
-		fprintf(stderr,"could not load mail\n");
+		fprintf(stderr,ERROR"could not load mail\n"ERROR);
+		return 1;
 	}
 
 	int data_socket;
@@ -141,18 +191,25 @@ int start_daemon(){
 		close(data_socket);
 	}
 
+	/* dump any unread mails into a file */
+	//result = dump_mail();
+
 	/* cleanup */
 	pthread_mutex_lock(&lock);//extra safety if the threads havent finnished yet
+	printf("cleaning up %d mails...\n",mail.count);
 	for (int i=0;i<mail.count;i++){
+		printf("freeing mail header %d\n",i);
 		free(mail.header[i]);
+		printf("freeing mail body %d\n",i);
 		free(mail.body[i]);
 	}
+	printf("freeing structs...\n");
 	free(mail.header);
 	free(mail.body);
+	printf("closing socket...\n");
 	pthread_mutex_unlock(&lock);
 	close_named_socket(server,SOCKET_FD);
-	/* dump any unread mails into a file */
-	result = dump_mail();
+	printf("cleanup done\n");
 	pthread_mutex_destroy(&lock);
 	return result;
 }
