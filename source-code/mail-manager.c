@@ -44,9 +44,12 @@ int main(int argc, char *argv[]){
 			break;
 		}
 	}
-	if(args.number_single == 0){
+	if (argc < 2){//no args passed
+		client_view_mail();
+	}else if(args.number_single == 0){
 		result = client_send_mail(args);
 	}
+
 	free_args(&args);
 	return result;
 }
@@ -170,6 +173,7 @@ int dump_mail(){
 	return 0;
 }
 int start_daemon(){
+	int close_socket = 1;
 	mail.count = 0;
 	mail.header = malloc(sizeof(char*));
 	mail.body = malloc(sizeof(char*));
@@ -191,11 +195,13 @@ int start_daemon(){
 	}
 	listen(server,10);
 	while (!stop){
+		close_socket = 1;
 		data_socket = accept(server,NULL,NULL);
 		receive_string(data_socket,&buffer);
 		if (strcmp(buffer,"view") == 0){
 			free(buffer);
 			pthread_create(&thread_id,NULL,daemon_view_mail,(void *)(long)data_socket); //break of a seperate thread to deal with that
+			close_socket = 0;
 		}else if (strcmp(buffer,"send") == 0){
 			daemon_receive_mail(data_socket);
 			free(buffer);
@@ -203,7 +209,9 @@ int start_daemon(){
 			stop = 1;
 		}
 		/* clean up connection */
-		close(data_socket);
+		if (close_socket){
+			close(data_socket);
+		}
 	}
 
 	/* dump any unread mails into a file */
@@ -229,14 +237,18 @@ int start_daemon(){
 	pthread_mutex_destroy(&lock);
 	return result;
 }
-void *daemon_view_mail(){
+void *daemon_view_mail(void *socket){
+	int data_socket = (long)socket;
+	printf("initiating viewing mail with the client on socket %d\n",data_socket);
 	char *buffer;
 	int selected;
 	if (pthread_mutex_lock(&lock)<0){
 		fprintf(stderr,"start_daemon: mutex failed to lock\n");
 		exit(EXIT_FAILURE);
 	}
+	printf("sending mail count of %d...\n",mail.count);
 	send_int(data_socket,mail.count);// start communication by specifying the number of mails
+	printf("done\n");
 	if (pthread_mutex_unlock(&lock)<0){
 		fprintf(stderr,"start_daemon: mutex failed to unlock\n");
 		exit(EXIT_FAILURE);
@@ -245,6 +257,7 @@ void *daemon_view_mail(){
 		receive_string(data_socket,&buffer);//check if more mails are wanted or finnished
 		selected = receive_int(data_socket);
 		if (strcmp(buffer,"done") == 0){
+			printf("communication complete\n");
 			break;
 		}
 		/* guaranteed atomicity of all operations */
@@ -261,6 +274,8 @@ void *daemon_view_mail(){
 		/* allow other threads to use hardware after this point */
 	}
 	free(buffer);
+	close(data_socket);
+	printf("Client mail communication complete. Exiting thread\n");
 	return NULL;
 }
 void client_view_mail(){
