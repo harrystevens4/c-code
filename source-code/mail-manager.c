@@ -34,6 +34,7 @@ void kill_daemon();
 
 int main(int argc, char *argv[]){
 	int result = 0;
+	char *err;
 	struct args args;
 	parse_args(argc,argv,&args);
 	for (int i = 0;i<args.number_single;i++){
@@ -43,6 +44,15 @@ int main(int argc, char *argv[]){
 		}
 		if (args.single[i] == 'k'){
 			kill_daemon();
+			break;
+		}
+		if (args.single[i] == 'r'){
+			if (args.number_other < 1){
+				fprintf(stderr,"Please specify the index of the mail to delete\n");
+				return 1;
+			}
+			int index = strtol(args.other[0],&err,10);
+			client_delete_mail(index);
 			break;
 		}
 	}
