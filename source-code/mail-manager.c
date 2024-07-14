@@ -396,7 +396,14 @@ void daemon_delete_mail(int data_socket){
 		return;
 	}
 	/* remove mail from mail struct */
+	// we move the last element of the array to the position being deleted and shrink array by 1
+	mail.header[mail_index] = mail.header[mail.count-1];
+	mail.header = realloc(mail.header,sizeof(char*)*(mail.count-1));
+	mail.body[mail_index] = mail.body[mail.count-1];
+	mail.body = realloc(mail.body,sizeof(char*)*(mail.count-1));
+	mail.count--;
 	/* delete mail file if it exists */
+	//do stuff with files
 	if (pthread_mutex_unlock(&lock) != 0){
 		fprintf(stderr,ERROR"Critical mutex unlocking error in daemo n_delete_mail\n"ERROR);
 	}
