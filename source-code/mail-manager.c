@@ -27,6 +27,8 @@ int client_send_mail(struct args args);
 void client_view_mail();
 int start_daemon();
 int dump_mail();
+int client_delete_mail(int mail_index);
+void daemon_delete_mail(int data_socket);
 int load_mail();
 void kill_daemon();
 
@@ -366,6 +368,41 @@ int client_send_mail(struct args args){
 	printf("mail sent!\n");
 	return 0;
 }
+int client_delete_mail(int mail_index){
+	printf("attempting to delete mail...\n");
+	int status = 0;
+	/* open comms with daemon */
+	int data_socket = connect_named_socket(SOCKET_FD);
+	send_string(data_socket,"delete");//tell the daemon that we want to delete mail
+	send_int(data_socket,mail_index); //comunicate which mail should be deleted.
+	status = receive_int(data_socket);
+	if (status != 0){
+		fprintf(stderr,ERROR"Could not delete mail of specified index. Are you sure it exists?"ERROR);
+	}
+	/* cleanup */
+	close(data_socket);
+	return status;
+}
+void daemon_delete_mail(int data_socket){
+	int mail_index = receive_int(data_socket);
+	printf("attempting to delete mail of index %d\n",mail_index);
+	if (pthread_mutex_lock(&lock) != 0){
+		fprintf(stderr,ERROR"Critical mutex locking error in daemo n_delete_mail\n"ERROR);
+	}
+	/* validation checks */
+	if ( ! ((mail_index > 0) && (mail_index < mail.count))){// check if it within range
+		printf("invalaid mail index for deletion given\n");
+		send_int(data_socket,1);
+		return;
+	}
+	/* remove mail from mail struct */
+	/* delete mail file if it exists */
+	if (pthread_mutex_unlock(&lock) != 0){
+		fprintf(stderr,ERROR"Critical mutex unlocking error in daemo n_delete_mail\n"ERROR);
+	}
+	printf("successful deletion of mail\n");
+}
+
 void kill_daemon(){
 	printf("killing daemon...\n");
 	int socket = connect_named_socket(SOCKET_FD);
