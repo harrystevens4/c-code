@@ -46,7 +46,7 @@ int main(int argc, char *argv[]){
 			kill_daemon();
 			break;
 		}
-		if (args.single[i] == 'r'){
+		if (args.single[i] == 'r'){// deleting mail at specified index of the array.
 			if (args.number_other < 1){
 				fprintf(stderr,"Please specify the index of the mail to delete\n");
 				return 1;
@@ -378,7 +378,7 @@ int client_send_mail(struct args args){
 	printf("mail sent!\n");
 	return 0;
 }
-int client_delete_mail(int mail_index){
+int client_delete_mail(int mail_index){//safety checks completed back in main function
 	printf("attempting to delete mail...\n");
 	int status = 0;
 	/* open comms with daemon */
@@ -417,6 +417,7 @@ void daemon_delete_mail(int data_socket){
 	if (pthread_mutex_unlock(&lock) != 0){
 		fprintf(stderr,ERROR"Critical mutex unlocking error in daemo n_delete_mail\n"ERROR);
 	}
+	send_int(data_socket,0);//signal success
 	printf("successful deletion of mail\n");
 }
 
