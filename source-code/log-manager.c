@@ -42,7 +42,11 @@ void *thread(){
 }
 
 int connect_daemon(){
+	int data;
 	int data_socket = connect_named_socket(SOCKET_FD);
 	close(data_socket);
+	while ((data=read(stdin, buffer, LINE_MAX))>0){//read from standard input (for pipes)
+		printf("buffer: %c",buffer[0])
+	}
 	return 0;
 }
