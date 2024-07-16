@@ -399,6 +399,10 @@ int client_delete_mail(int mail_index){//safety checks completed back in main fu
 	return status;
 }
 void daemon_delete_mail(int data_socket){
+	char *error;
+	int result = 0;
+	int status;
+	char mail_file_path[180];
 	int mail_index = receive_int(data_socket);
 	printf("attempting to delete mail of index %d\n",mail_index);
 	if (pthread_mutex_lock(&lock) != 0){
@@ -421,12 +425,44 @@ void daemon_delete_mail(int data_socket){
 	mail.body = realloc(mail.body,sizeof(char*)*(mail.count-1));
 	mail.count--;
 	/* delete mail file if it exists */
+	printf("searching for mail file with corresponding index\n");
+	DIR *directory;
+	struct dirent *dir;
+	directory = opendir(MAIL_LOCATION);
+	if (directory){
+		while ((dir = readdir(directory)) != NULL){
+			if (dir->d_type == DT_REG){//make sure it is a file
+				if (((int)strtol(dir->d_name,&error,10) == mail_index)){
+					result = snprintf(mail_file_path,180,"%s/%s",MAIL_LOCATION,dir->d_name);
+					if (result >= 180){//size of mail_file_path
+						fprintf(stderr,ERROR"File path was to long!\n"ERROR);
+						status = 1;	
+						break;
+					}
+					printf("found mail file match %s, deleting...\n",dir->d_name);
+					result = remove(mail_file_path);
+					if (result != 0){
+						fprintf(stderr,ERROR"Could not remove file %s. May be due to lack of permitions\n"ERROR,mail_file_path);
+						status = 1;
+						break;
+					}
+					break;
+				}
+			}
+		}
+	}
+	closedir(directory);
+	printf("done\n");
 	//do stuff with files
 	if (pthread_mutex_unlock(&lock) != 0){
 		fprintf(stderr,ERROR"Critical mutex unlocking error in daemo n_delete_mail\n"ERROR);
 	}
-	send_int(data_socket,0);//signal success
-	printf("successful deletion of mail\n");
+	send_int(data_socket,status);//signal success if status is 0
+	if (status == 0){
+		printf("successful deletion of mail\n");
+	}else{
+		fprintf(stderr,ERROR"Could not fully remove mail of index %d.\n"ERROR,mail_index);
+	}
 }
 
 void kill_daemon(){
