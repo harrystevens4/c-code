@@ -1,0 +1,29 @@
+.\" Manpage for mail-manager
+.TH man 8 "17 July 2024" "1.0" "mail-manager manual page"
+.SH NAME
+mail-manager
+.SH SYNOPSIS
+manage mails between programs
+.SH DESCRIPTION
+Has a daemon that can handle requests to get current mail, delete, and create new mails. the mails are stored in the programs memory at runtime, and when told to stop, it will write the mails to files so they can be picked up again when it starts again.
+.SH SYNTAX
+mail-manager [options] ...
+.SH OPTIONS:
+.Bl comments
+.It
+-d : starts the program as a daemon. should be used with root privelages.
+.It
+-r : remove mail of a specified index.
+.It
+-k : send kill signal to the daemon
+.It
+"<header>" "<body>" : creates new mail with that header and body. Note: no newlines allowed in the header. Newlines are fine in the body.
+.It
+No args : get the current mails stored in the daemon at the time and print them to the terminal
+.El
+.SH SEE ALSO
+Nothing currently. 
+.SH BUGS
+If the daemon is not executed with root privelages, undefined behavior can occur when it tries to delete mail and store mail on shutdown.
+.SH AUTHOR
+rufus173
