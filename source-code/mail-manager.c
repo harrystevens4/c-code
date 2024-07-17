@@ -134,6 +134,7 @@ int load_mail(){
 				mail.count++;
 				//printf("mail count now %d\n",mail.count);
 				//printf("	[header]\n	%s\n	[body]\n	%s	[end]\n",mail.header[mail.count-1],mail.body[mail.count-1]);
+				printf("loaded mail %d\n",mail.count-1);
 				if (pthread_mutex_unlock(&lock) != 0){
 					fprintf(stderr,ERROR"mutex unlocking error in load_mail()\n"ERROR);
 					return 1;
@@ -401,15 +402,21 @@ int client_delete_mail(int mail_index){//safety checks completed back in main fu
 void daemon_delete_mail(int data_socket){
 	char *error;
 	int result = 0;
-	int status;
+	int status = 0;
 	char mail_file_path[180];
+	char last_mail_file_path[180];
 	int mail_index = receive_int(data_socket);
 	printf("attempting to delete mail of index %d\n",mail_index);
 	if (pthread_mutex_lock(&lock) != 0){
-		fprintf(stderr,ERROR"Critical mutex locking error in daemo n_delete_mail\n"ERROR);
+		fprintf(stderr,ERROR"Critical mutex locking error in daemon_delete_mail\n"ERROR);
+	}
+	result = snprintf(last_mail_file_path,180,"%s/%d",MAIL_LOCATION,mail.count-1);
+	if (result >= 180){
+		fprintf(stderr,ERROR"Could not calculate the last mail's file path, due to potential buffer overflow.\n"ERROR);
+		status = 1;
 	}
 	/* validation checks */
-	if ( ! ((mail_index > 0) && (mail_index < mail.count))){// check if it within range
+	if ( ! ((mail_index >= 0) && (mail_index < mail.count))){// check if it within range
 		printf("invalaid mail index for deletion given\n");
 		send_int(data_socket,1);
 		if (pthread_mutex_unlock(&lock) != 0){
@@ -432,6 +439,7 @@ void daemon_delete_mail(int data_socket){
 	if (directory){
 		while ((dir = readdir(directory)) != NULL){
 			if (dir->d_type == DT_REG){//make sure it is a file
+				/* rename last inded name file to index being deleted (same method as deleting mail entries within the struct) */
 				if (((int)strtol(dir->d_name,&error,10) == mail_index)){
 					result = snprintf(mail_file_path,180,"%s/%s",MAIL_LOCATION,dir->d_name);
 					if (result >= 180){//size of mail_file_path
@@ -439,12 +447,25 @@ void daemon_delete_mail(int data_socket){
 						status = 1;	
 						break;
 					}
-					printf("found mail file match %s, deleting...\n",dir->d_name);
-					result = remove(mail_file_path);
-					if (result != 0){
-						fprintf(stderr,ERROR"Could not remove file %s. May be due to lack of permitions\n"ERROR,mail_file_path);
-						status = 1;
-						break;
+					printf("checking for existence of %s and %s...\n",mail_file_path,last_mail_file_path);
+					printf("checking it isn't the last mail...%d/%d \n",(int)strtol(dir->d_name,&error,10),mail.count);
+					if (((access(mail_file_path,F_OK) == 0) && (((int)strtol(dir->d_name,&error,10) != mail.count)) && (access(last_mail_file_path,F_OK) == 0))){//the mail exists and it isnt the last element
+						//move last mail element to the deleting mail index
+						printf("attempting to remove by renaming...\n");
+						result = rename((const char *)last_mail_file_path,(const char *)mail_file_path);//rename file (final step)
+						if (result != 0){
+							fprintf(stderr,ERROR"Could not rename file.\n"ERROR);
+						}
+
+					}else{
+						//just delete the mail file
+						printf("found mail file match %s, deleting...\n",dir->d_name);
+						result = remove(mail_file_path);
+						if (result != 0){
+							fprintf(stderr,ERROR"Could not remove file %s. May be due to lack of permitions\n"ERROR,mail_file_path);
+							status = 1;
+							break;
+						}
 					}
 					break;
 				}
