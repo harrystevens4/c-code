@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include <stdint.h>
 #include <string.h>
 #include <stdio.h>
 #include <locale.h>
@@ -6,8 +7,8 @@
 #include <ncurses.h> // use -lncursesw when compiling
 
 //defining globals
-int terminal_height;
-int terminal_width;
+volatile int terminal_height;
+volatile int terminal_width;
 int centre_x;
 int centre_y;
 
@@ -18,7 +19,6 @@ int main(){
 	setlocale(LC_ALL,"");//unicode fonts
 	
 	//setting up variables
-	get_term_info();
 
 	//setting up multi purpose buffers
 	char *buffer;
@@ -26,10 +26,10 @@ int main(){
 
 	//init ncurses related things
 	initscr();
+	get_term_info();
 	cbreak();
 	refresh();
 	display_popup("This program will now attempt to connect to the mail daemon.");
-	sleep(1);
 	endwin();
 
 	//cleanup
@@ -38,28 +38,48 @@ int main(){
 }
 void get_term_info(){
 	terminal_height = LINES;
+	printf("initialised terminal height to %d\n",terminal_height);
 	terminal_width = COLS;
+	printf("initialised terminal width to %d\n",terminal_width);
 	centre_x = terminal_width/2;
 	centre_y = terminal_height/2;
 }
 void display_popup(const char *text){
 	//figure out perameters from text
-	int height = 4;
-	int width = 0;
-	int y;
-	int x;
+	unsigned int height = 4;
+	unsigned int width = 4;
+	int y = 0;
+	int x = 0;
+	int length = 0; 
+	int max_length = 0;
 	for (int i = 0;i<strlen(text);i++){
-		height++;
+		length++;
+		if (text[i] == '\n'){
+			height++;
+			length = 0;
+		}
+		if (length > max_length){
+			max_length = length;
+		}
+		
 	}
-	x = terminal_width - (width/2);
-	y = terminal_height - (height/2);
+	width += max_length;
+	x = (centre_x - (width / 2));
+	y = (centre_y - (height / 2));
+	if (x<0){
+		x=0;
+	}
+	if (y<0){
+		y=0;
+	}
 	//make the window
 	WINDOW *popup_window;
 	popup_window = newwin(height,width,y,x);
 	box(popup_window,0,0);
-	mvwprintw(popup_window,0,0,"%sepic and based",text);
 	wrefresh(popup_window);
+	mvprintw(y+1,x+2,"%s",text);
 	refresh();
+	//refresh();
 	getch(); //wait for input
 	delwin(popup_window);//remove the window
 }
