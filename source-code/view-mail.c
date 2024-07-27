@@ -6,6 +6,7 @@
 #include <locale.h>
 #include <unistd.h>
 #include <ncurses.h> // use -lncursesw when compiling
+#include <curses.h> //for macro definitions
 
 //defining globals
 volatile int terminal_height;
@@ -35,10 +36,12 @@ int main(){
 	refresh();
 	
 	//connect to the daemon
+	int key;
 	int index = 0;
 	int socket = connect_named_socket("/tmp/mail-manager.socket");
 	char *header;
 	char *body;
+	char *full_mail;
 	send_string(socket,"view");
 	int mail_count = receive_int(socket);
 	if (mail_count == 0){
@@ -58,11 +61,21 @@ int main(){
 		receive_string(socket,&header);
 		receive_string(socket,&body);
 
+		//create popup
+		full_mail = malloc((strlen(body)+strlen(header)+2)*sizeof(char));
+		sprintf(full_mail,"%s\n%s",header,body);
+		key = display_popup((const char *)full_mail,"<next>");
+
 		//cleanup before next transmition
 		free(header);
 		free(body);
+		free(full_mail);
+		if (key == 'q'){
+			break;
+		}
 
 	}
+	send_string(socket,"done");
 
 	//cleanup
 	free(buffer);
