@@ -30,6 +30,7 @@ int main(){
 	initscr();
 	keypad(stdscr, TRUE);
 	noecho();
+	curs_set(0);
 	get_term_info();
 	cbreak();
 	refresh();
@@ -65,9 +66,10 @@ int main(){
 
 		//create popup
 		full_mail = malloc((strlen(body)+strlen(header)+2)*sizeof(char));
-		sprintf(full_mail,"%s\n%s",header,body);
+		sprintf(full_mail,"%s\n-----\n%s",header,body);
 		clear();
 		refresh();
+		mvprintw(0,(int)((terminal_width/2)-4),"⇐ %d/%d ⇒",index+1,mail_count);
 		key = display_popup((const char *)full_mail,"<next>");
 
 		//cleanup before next transmition
@@ -76,9 +78,6 @@ int main(){
 		free(full_mail);
 		if (key == 'q'){
 			break;
-		}else if(key == 'd'){
-			//delete selected mail
-			int socket = connect_named_socket("/tmp/mail-manager.socket");
 		}else if (key == KEY_LEFT){
 			if (index-1>=0){
 				index--;
@@ -86,6 +85,13 @@ int main(){
 		}else if (key == KEY_RIGHT){
 			if (index+1<mail_count){
 				index++;
+			}
+		}else if (key == 'd'){
+			clear();
+			refresh();
+			if (display_popup("Are you sure you want to delete this?","<y/n>") == 'y'){
+				int socket = connect_named_socket("/tmp/mail-manager.socket");
+				//delete mail
 			}
 		}
 
@@ -107,12 +113,12 @@ void get_term_info(){
 }
 int display_popup(const char *text,const char *tooltip){
 	//figure out perameters from text
-	unsigned int height = 4;
+	unsigned int height = 5;
 	unsigned int width = 4;
 	int y = 0;
 	int x = 0;
 	int length = 0; 
-	int max_length = 0;
+	int max_length = strlen(tooltip);
 	for (int i = 0;i<strlen(text);i++){
 		length++;
 		if ((text[i] == '\n') && (text[i+1] != '\0')){
@@ -154,6 +160,7 @@ int display_popup(const char *text,const char *tooltip){
 		mvprintw(text_y,text_x,"%c",text[i]);
 		text_x++;
 	}
+	mvhline(y+height-3,x+2,0,width-4);
 	mvprintw(y+height-2,x+2,"%s",tooltip);
 	refresh();
 	//refresh();
