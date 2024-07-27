@@ -270,11 +270,11 @@ void *daemon_view_mail(void *socket){
 	}
 	while (!stop){
 		receive_string(data_socket,&buffer);//check if more mails are wanted or finnished
-		selected = receive_int(data_socket);
 		if (strcmp(buffer,"done") == 0){
 			printf("communication complete\n");
 			break;
 		}
+		selected = receive_int(data_socket);
 		/* guaranteed atomicity of all operations */
 		if (pthread_mutex_lock(&lock)<0){
 			fprintf(stderr,"start_daemon: mutex failed to lock\n");
