@@ -1,4 +1,5 @@
 #include <stdlib.h>
+#include "daemon-toolkit.h" //compile with daemon-toolkit.c
 #include <stdint.h>
 #include <string.h>
 #include <stdio.h>
@@ -12,7 +13,7 @@ volatile int terminal_width;
 int centre_x;
 int centre_y;
 
-void display_popup(const char *text);
+int display_popup(const char *text,const char *tooltip);
 void get_term_info();
 
 int main(){
@@ -29,11 +30,43 @@ int main(){
 	get_term_info();
 	cbreak();
 	refresh();
-	display_popup("This program will now attempt to connect to the mail daemon.");
-	endwin();
+	display_popup("This program will now attempt to connect to the mail daemon.\nThis may take a second.","<press any key to continue>");
+	clear();
+	refresh();
+	
+	//connect to the daemon
+	int index = 0;
+	int socket = connect_named_socket("/tmp/mail-manager.socket");
+	char *header;
+	char *body;
+	send_string(socket,"view");
+	int mail_count = receive_int(socket);
+	if (mail_count == 0){
+		send_string(socket,"done");
+		display_popup("There is no new mail to view.","<Press any key to exit>");
+		clear();
+		refresh();
+		endwin();
+		return 0;
+	}
+	for ( ; ; ){
+		//mainloop
+		send_string(socket,"more");
+		send_int(socket,index);//ask for mail that the user wanted
+
+		//get header and body
+		receive_string(socket,&header);
+		receive_string(socket,&body);
+
+		//cleanup before next transmition
+		free(header);
+		free(body);
+
+	}
 
 	//cleanup
 	free(buffer);
+	endwin();
 	return 0;
 }
 void get_term_info(){
@@ -44,7 +77,7 @@ void get_term_info(){
 	centre_x = terminal_width/2;
 	centre_y = terminal_height/2;
 }
-void display_popup(const char *text){
+int display_popup(const char *text,const char *tooltip){
 	//figure out perameters from text
 	unsigned int height = 4;
 	unsigned int width = 4;
@@ -66,20 +99,37 @@ void display_popup(const char *text){
 	width += max_length;
 	x = (centre_x - (width / 2));
 	y = (centre_y - (height / 2));
-	if (x<0){
-		x=0;
+	//make sure there is at least a 1 char margin on each side
+	if (x<1){
+		x=1;
 	}
-	if (y<0){
-		y=0;
+	if (y<1){
+		y=1;
 	}
+	if (width>terminal_width-2)
+		width = terminal_width - 2;
+	if (width>terminal_width-2)
+		width = terminal_height - 2;
 	//make the window
+	unsigned int text_x = x+2;
+	unsigned int text_y = y+1;
 	WINDOW *popup_window;
 	popup_window = newwin(height,width,y,x);
 	box(popup_window,0,0);
 	wrefresh(popup_window);
-	mvprintw(y+1,x+2,"%s",text);
+	for (int i = 0; i<strlen(text); i++){
+		if (text[i] == '\n'){
+			text_y++;
+			text_x = x+2;
+			continue;
+		}
+		mvprintw(text_y,text_x,"%c",text[i]);
+		text_x++;
+	}
+	mvprintw(y+height-2,x+2,"%s",tooltip);
 	refresh();
 	//refresh();
-	getch(); //wait for input
+	int key = getch(); //wait for input
 	delwin(popup_window);//remove the window
+	return key;
 }
