@@ -28,6 +28,8 @@ int main(){
 
 	//init ncurses related things
 	initscr();
+	keypad(stdscr, TRUE);
+	noecho();
 	get_term_info();
 	cbreak();
 	refresh();
@@ -64,6 +66,8 @@ int main(){
 		//create popup
 		full_mail = malloc((strlen(body)+strlen(header)+2)*sizeof(char));
 		sprintf(full_mail,"%s\n%s",header,body);
+		clear();
+		refresh();
 		key = display_popup((const char *)full_mail,"<next>");
 
 		//cleanup before next transmition
@@ -72,6 +76,17 @@ int main(){
 		free(full_mail);
 		if (key == 'q'){
 			break;
+		}else if(key == 'd'){
+			//delete selected mail
+			int socket = connect_named_socket("/tmp/mail-manager.socket");
+		}else if (key == KEY_LEFT){
+			if (index-1>=0){
+				index--;
+			}
+		}else if (key == KEY_RIGHT){
+			if (index+1<mail_count){
+				index++;
+			}
 		}
 
 	}
@@ -100,7 +115,7 @@ int display_popup(const char *text,const char *tooltip){
 	int max_length = 0;
 	for (int i = 0;i<strlen(text);i++){
 		length++;
-		if (text[i] == '\n'){
+		if ((text[i] == '\n') && (text[i+1] != '\0')){
 			height++;
 			length = 0;
 		}
