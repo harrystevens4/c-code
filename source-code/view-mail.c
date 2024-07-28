@@ -34,14 +34,15 @@ int main(){
 	get_term_info();
 	cbreak();
 	refresh();
-	display_popup("This program will now attempt to connect to the mail daemon.\nThis may take a second.","<press any key to continue>");
 	clear();
 	refresh();
 	
 	//connect to the daemon
 	int key;
+	int status;
 	int index = 0;
 	int socket = connect_named_socket("/tmp/mail-manager.socket");
+	int delete_socket;
 	char *header;
 	char *body;
 	char *full_mail;
@@ -90,15 +91,30 @@ int main(){
 			clear();
 			refresh();
 			if (display_popup("Are you sure you want to delete this?","<y/n>") == 'y'){
-				int socket = connect_named_socket("/tmp/mail-manager.socket");
+				delete_socket = connect_named_socket("/tmp/mail-manager.socket");
 				//delete mail
+				send_string(delete_socket,"delete");
+				send_int(delete_socket,index);
+				status = receive_int(delete_socket);
+				close(delete_socket);
+				mail_count--;
+				if (index>1){
+					index--;
+				}
 			}
+		}
+		if (mail_count<1){
+			clear();
+			refresh();
+			display_popup("No more mail to display.","<press any key to exit>");
+			break;
 		}
 
 	}
 	send_string(socket,"done");
 
 	//cleanup
+	close(socket);
 	free(buffer);
 	endwin();
 	return 0;
