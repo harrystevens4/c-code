@@ -274,6 +274,10 @@ void *daemon_view_mail(void *socket){
 			printf("communication complete\n");
 			break;
 		}
+		if (mail.count<1){//safety to prevent seg fault
+			fprintf(stderr,ERROR"Client wants more mail, but none to give!"ERROR);
+			break;
+		}
 		selected = receive_int(data_socket);
 		/* guaranteed atomicity of all operations */
 		if (pthread_mutex_lock(&lock)<0){
