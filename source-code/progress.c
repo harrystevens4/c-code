@@ -4,6 +4,7 @@
 #include <string.h>
 #include "args.h"
 #include <unistd.h>
+#define BUFFER_SIZE 1024
 
 int total_lines;
 struct winsize window_size;
@@ -12,18 +13,28 @@ int width;
 void print_line(const char *line);
 void print_progress(int progress, int total);
 int main(int argc, char **argv){
+	int buffer_size = BUFFER_SIZE;
+	char *data;
+	char buffer[buffer_size];
 	ioctl(STDOUT_FILENO,TIOCGWINSZ, &window_size);
 	width = window_size.ws_col;
-	total_lines = 3;
+	total_lines = 0;
 	struct args args;
 	parse_args(argc,argv,&args);
+	for (;;){
+		if ((args.number_other == 0) && (args.number_single == 0)){
+			total_lines++;
+		}
+		data = fgets(buffer, sizeof(buffer), stdin);
+		if (data == NULL){// if the pipe is closed, stop
+			return 0;
+		}
+		if (buffer[strlen(buffer)-1] == '\n'){
+			buffer[strlen(buffer)-1] = '\0';
+		}
+		print_line((const char *)buffer);
+	}
 	free_args(&args);
-	print_line("a");
-	sleep(1);
-	print_line("b");
-	sleep(1);
-	print_line("c");
-	sleep(1);
 	printf("\n"); //make sure to clean up after progress bar
 	return 0;
 }
