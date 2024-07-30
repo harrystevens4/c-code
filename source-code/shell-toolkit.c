@@ -1,43 +1,57 @@
-static input_connected // 0 for no 1 for yes
-int connected_to_pipe(){//returns 1 on true
-}
-const char *get_pipe_input_executable(){
-        char command_buffer[1024];                                                                 
-        int pid = 660;                                                                             
-        char executable_location[1024];                                                            
-        char *result;                                                                              
-        FILE *output_file;                                                                         
-        if ((args.number_single > 0) && (args.number_other > 0)){                                  
-                if (args.single[0] == 'c'){                                                        
-                        total_lines = (int)strtol(args.other[0],(char **)NULL, 10);                
-                }                                                                                  
-                                                                                                   
-        }else{                                                                                     
-                //analyse script on otherside of pipe to attempt to decipher total_lines           
-                                                                                                   
-                pid = getpgrp();//magic command to get the other side of the pipes pid             
-                                                                                                   
-                printf("attempting to analyse executable...\n");                                   
-                sprintf(command_buffer,"readlink -f /proc/%d/exe",pid);//get executable location   
-                printf("attempting to run %s\n",command_buffer);                                   
-                output_file = popen(command_buffer,"r");                                           
-                result = fgets(executable_location,1024,output_file);                              
-                if (result != NULL){                                                               
-                        if (output_file == NULL){                                                  
-                                printf("something went wrong whilst executing %s\n",command_buffer);                                                                                                  
-                        }                                                                          
-                        if (feof(output_file)){                                                    
-                                printf("could not deduce executable location\n");                  
-                        }                                                                          
-                }else{                                                                             
-                        printf("no executable location found\n");                                  
-                }                                                                                  
-                printf("%s",executable_location);                                                  
-                                                                                                   
-                pclose(output_file); 
+#include "shell-toolkit.h"
+#include <string.h>
+#include <stdio.h>
+#include <unistd.h>
+
+static volatile int output_tty; // 0 for no 1 for yes
+static volatile int input_tty; // 0 for no 1 for yes
+static char return_buffer[1024];
+
+int connected_to_tty(){//returns 1 if both stdout and stdin are a tty
+	output_tty = 0;
+	input_tty = 0;
+	if (isatty(STDOUT_FILENO)){
+		output_tty = 1;
+	}
+	if (isatty(STDIN_FILENO)){
+		input_tty = 1;
+	}
+	if (output_tty && input_tty){
+		return 1;
+	}else{
+		return 0;
 	}
 }
-connected_pipe_input(){//returns 1 on true (used in if statement)
+char *get_calling_process_executable(){
+	return_buffer[0] == '\0';
+	char command_buffer[1024];
+	int pid = 660;
+	char *result;
+	FILE *output_file;
+	//check if connected to pipe
+	if (connected_pipe_output()){//detect if we should get other side of pipe or parent pid
+		pid = getpgrp();//magic command to get the other side of the pipes pid             
+		printf("using parent group id\n");
+	}else{
+		printf("using parent pid\n");
+		pid = getppid();
+	}
+	//attempt to find the executable location corresponding to the pid
+	sprintf(command_buffer,"readlink -f /proc/%d/exe",pid);//get executable location   
+	output_file = popen(command_buffer,"r");                                           
+	result = fgets(return_buffer,1024,output_file);                              
+	pclose(output_file); 
+	//stripping newlines from the end
+	if (return_buffer[strlen(return_buffer)-1] == '\n'){
+		return_buffer[strlen(return_buffer)-1] = '\0';
+	}
+	return return_buffer;
 }
-connected_pipe_output(){//returns 1 on true
+int connected_pipe_input(){//returns 1 on true (used in if statement)
+	connected_to_tty();
+	return !output_tty;
+}
+int connected_pipe_output(){//returns 1 on true
+	connected_to_tty();//sets the output_tty and input_tty variables
+	return !input_tty;
 }
