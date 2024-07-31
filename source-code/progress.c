@@ -3,6 +3,7 @@
 #include <stdio.h>
 #include <string.h>
 #include "args.h"
+#include "shell-toolkit.h"
 #include <unistd.h>
 #define BUFFER_SIZE 1024
 
@@ -13,12 +14,15 @@ int width;
 void print_line(const char *line);
 void print_progress(int progress, int total);
 int main(int argc, char **argv){
+	int autodetected = 0;
 	int buffer_size = BUFFER_SIZE;
 	char *data;
-	char buffer[buffer_size];
-	char command_buffer[1024];
+	FILE *script;
+	char buffer[BUFFER_SIZE];
+	char script_location[BUFFER_SIZE];
+	char command_buffer[BUFFER_SIZE];
 	int pid = 660;
-	char executable_location[1024];
+	char executable_location[BUFFER_SIZE];
 	char *result;
 	FILE *output_file;
 	ioctl(STDOUT_FILENO,TIOCGWINSZ, &window_size);
@@ -32,30 +36,27 @@ int main(int argc, char **argv){
 		}
 
 	}else{
-		//analyse script on otherside of pipe to attempt to decipher total_lines
-		printf("getppid: %d\n",getppid());
-		pid = getpgrp();
-		printf("attempting to analyse executable...\n");
-		sprintf(command_buffer,"readlink -f /proc/%d/exe",pid);//get executable location
-		printf("attempting to run %s\n",command_buffer);
-		output_file = popen(command_buffer,"r");
-		result = fgets(executable_location,1024,output_file);
-		if (result != NULL){
-			if (output_file == NULL){
-				printf("something went wrong whilst executing %s\n",command_buffer);
+		//analasys
+		printf("attempting analasys of bash script\n");
+		get_pipe_input_bash_script_location(script_location,BUFFER_SIZE);
+		printf("%s\n",script_location);
+		//count the number of lines that contain "echo" or "printf"
+		script = fopen(script_location,"r");
+		for (;;){
+			if (feof(script)){
+				break; //stop at end of file
 			}
-			if (feof(output_file)){
-				printf("could not deduce executable location\n");
+			fgets(buffer,BUFFER_SIZE,script);
+			if(strstr(buffer,"echo")){
+				total_lines++;
 			}
-		}else{
-			printf("no executable location found\n");
 		}
-		printf("%s",executable_location);
-		
-		pclose(output_file);
+		fclose(script);
+		printf("analysed with result of %d lines detected\n",total_lines);
+		autodetected = 1;
 	}
 	for (;;){
-		if ((args.number_other == 0) && (args.number_single == 0)){
+		if (((args.number_other == 0) && (args.number_single == 0)) && (autodetected == 0)){
 			total_lines++;
 		}
 		data = fgets(buffer, sizeof(buffer), stdin);
