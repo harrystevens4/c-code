@@ -7,6 +7,22 @@ static volatile int output_tty; // 0 for no 1 for yes
 static volatile int input_tty; // 0 for no 1 for yes
 static char return_buffer[1024];
 
+char* get_pipe_input_bash_script_location(char *return_string,int sizeof_return_string){
+	char buffer[1024];
+       	printf("pipe output connected:%d\npipe input connected:%d\n",connected_pipe_output(),connected_pipe_input());
+        int parent_pid = getpgrp();
+        FILE *fp;
+        snprintf(buffer,1024,"readlink -f /proc/%d/fd/255",parent_pid);
+        fp = popen(buffer,"r");
+        fgets(return_string,sizeof_return_string,fp);
+        pclose(fp);
+        //strip newline to make it easier to process
+        if (return_string[strlen(return_string)-1] == '\n'){
+                return_string[strlen(return_string)-1] = '\0';
+        }
+        printf("file location:%s\n",return_string);
+}
+
 int connected_to_tty(){//returns 1 if both stdout and stdin are a tty
 	output_tty = 0;
 	input_tty = 0;
