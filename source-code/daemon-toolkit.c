@@ -21,6 +21,7 @@ struct buffer{
 
 pthread_mutex_t tty_lock;
 volatile int STOP = 0;
+int non_lethal_errors;
 
 void free_buffer(struct buffer *buffer){
 	free(buffer->lengths);
@@ -40,8 +41,12 @@ int make_named_socket (const char *filename){
   sock = socket (AF_UNIX, SOCK_STREAM, 0);
   if (sock < 0)
     {
-      perror ("socket");
-      exit (EXIT_FAILURE);
+	perror ("socket");
+	    if (non_lethal_errors){
+		    return -1;
+	    }else{
+		exit (EXIT_FAILURE);
+	    }
     }
 
   /* allow reuse of socket address */
@@ -62,8 +67,12 @@ int make_named_socket (const char *filename){
 
   if (bind (sock, (struct sockaddr *) &name, sizeof(struct sockaddr_un)) < 0)
     {
-      perror ("bind");
+	perror ("bind");
+	    if (non_lethal_errors){
+		return -1;
+	    }else{
       exit (EXIT_FAILURE);
+	    }
     }
   if (chmod(filename,strtol("1777", 0, 8)) != 0){
 	  fprintf(stderr,"Could not make socket accesable for all users.\n");
@@ -83,7 +92,11 @@ int connect_named_socket (const char *filename){
   if (sock < 0)
     {
       perror ("socket");
+	    if (non_lethal_errors){
+		    return -1;
+	    }else{
       exit (EXIT_FAILURE);
+	    }
     }
 
   /* allow reuse of socket address */
@@ -104,7 +117,11 @@ int connect_named_socket (const char *filename){
   //        + strlen (name.sun_path));
   if(connect(sock,(const struct sockaddr *) &name,sizeof(struct sockaddr_un))<0){
 	  perror("connect");
+	  if (non_lethal_errors){
+		  return -1;
+	  }else{
 	  exit(EXIT_FAILURE);
+	  }
   }
 
   return sock;
@@ -120,7 +137,11 @@ int receive_string(int socket,char **string_buffer){
 		result = read(socket,buffer,buffer_size);
 		if (result<0){
 			perror("read");
-			exit(EXIT_FAILURE);
+			if (non_lethal_errors){
+				return -1;
+			}else{
+				exit(EXIT_FAILURE);
+			}
 		}
 		if (!(strncmp(buffer,END,strlen(END)))){
 			//printf("got end of transmition signal\n");
@@ -138,7 +159,11 @@ int receive_string(int socket,char **string_buffer){
 		result = write(socket,buffer,4);//standard length for command verbs is 3 chars + \0
 		if (result<0){
 			perror("write");
-			exit(EXIT_FAILURE);
+			if (non_lethal_errors){
+				return -1;
+			}else{
+				exit(EXIT_FAILURE);
+			}
 		}
 		//printf("acknowledgement sent\n");
 	}
@@ -154,20 +179,32 @@ int send_string(int socket,const char *string){
 		result = write(socket,buffer,4);
 		if (result<0){
 			perror("write");
-			exit(EXIT_FAILURE);
+			if (non_lethal_errors){
+				return -1;
+			}else{
+				exit(EXIT_FAILURE);
+			}
 		}
 		//printf("awaiting acknowledgement\n");
 		result = read(socket,buffer,4);
 		if (result<0){
 			perror("read");
-			exit(EXIT_FAILURE);
+			if (non_lethal_errors){
+				return -1;
+			}else{
+				exit(EXIT_FAILURE);
+			}
 		}
 	}	
 	//printf("sending end of transmition\n");
 	result = write(socket,END,4);
 	if (result<0){
 		perror("write");
-		exit(EXIT_FAILURE);
+		if (non_lethal_errors){
+			return -1;
+		}else{
+			exit(EXIT_FAILURE);
+		}
 	}
 	return 0;
 }
@@ -184,12 +221,20 @@ int send_int(int socket, int number){
 		result = write(socket,buffer,2);
 		if (result < 0){
 			perror("write");
-			exit(EXIT_FAILURE);
+			if (non_lethal_errors){
+				return -1;
+			}else{
+				exit(EXIT_FAILURE);
+			}
 		}
 		result = read(socket,buffer,4);
 		if (result < 0){
 			perror("read");
-			exit(EXIT_FAILURE);
+			if (non_lethal_errors){
+				return -1;
+			}else{
+				exit(EXIT_FAILURE);
+			}
 		}
 		//printf("got acknowledgement of %s\n",buffer);
 	}
@@ -209,7 +254,11 @@ int receive_int(int socket){
 		result = read(socket,buffer,4);
 		if (result < 0){
 			perror("read");
-			exit(EXIT_FAILURE);
+			if (non_lethal_errors){
+				return -1;
+			}else{
+				exit(EXIT_FAILURE);
+			}
 		}
 		if (strncmp(END,buffer,3) == 0){
 			string[i] = '\0';
@@ -222,7 +271,11 @@ int receive_int(int socket){
 		result = write(socket,ACK,2);
 		if (result < 0){
 			perror("write");
-			exit(EXIT_FAILURE);
+			if (non_lethal_errors){
+				return -1;
+			}else{
+				exit(EXIT_FAILURE);
+			}
 		}
 	}
 	number = strtol(string,&err,10);
@@ -242,7 +295,11 @@ int lock_tty(){
 	if (init == 0){
 		if (pthread_mutex_init(&tty_lock,NULL) != 0){
 			perror("mutex init:");
-			exit(EXIT_FAILURE);
+			if (non_lethal_errors){
+				return -1;
+			}else{
+				exit(EXIT_FAILURE);
+			}
 		}
 		init = 1;
 	}
