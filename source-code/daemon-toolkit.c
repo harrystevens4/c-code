@@ -9,7 +9,6 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/un.h>
-//#include "daemon-toolkit.h"
 #include <stdlib.h>
 #define END "END" //end of transmition
 #define ACK "ACK" //acknowledgement signal

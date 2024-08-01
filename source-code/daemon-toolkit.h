@@ -1,5 +1,6 @@
 #ifndef core_h_
 #define core_h_
+extern int non_lethal_errors;
 struct buffer{
 	int buffer_length; //number of strings in the buffer
 	int *lengths; //array of lengths corresponding to strings in buffer (not including null byte)
