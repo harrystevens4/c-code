@@ -10,14 +10,19 @@
 int total_lines;
 struct winsize window_size;
 int width;
+int line_count;
 
 void print_line(const char *line);
 void print_progress(int progress, int total);
 int main(int argc, char **argv){
 	int autodetected = 0;
+	line_count = 0;
+	int cache_exists = 0;
 	int buffer_size = BUFFER_SIZE;
 	char *data;
 	FILE *script;
+	FILE *script_cache;
+	char script_cache_location[BUFFER_SIZE];
 	char buffer[BUFFER_SIZE];
 	char script_location[BUFFER_SIZE];
 	char command_buffer[BUFFER_SIZE];
@@ -36,24 +41,35 @@ int main(int argc, char **argv){
 		}
 
 	}else{
-		//analasys
-		printf("attempting analasys of bash script\n");
+		//printf("attempting analasys of bash script\n");
 		get_pipe_input_bash_script_location(script_location,BUFFER_SIZE);
-		printf("%s\n",script_location);
-		//count the number of lines that contain "echo" or "printf"
-		script = fopen(script_location,"r");
-		for (;;){
-			if (feof(script)){
-				break; //stop at end of file
+		//printf("%s\n",script_location);
+		snprintf(script_cache_location,BUFFER_SIZE,"%s.progress",script_location);
+		//printf("attempting to open %s\n",script_cache_location);
+		if (script_cache = fopen(script_cache_location,"r")){// if a cache for the script already exists
+			fgets(buffer,BUFFER_SIZE,script_cache);	
+			total_lines = (int)strtol(buffer,(char**)NULL, 10);
+			autodetected = 1;
+			cache_exists = 1;
+			fclose(script_cache);
+		}else{
+			//analasys
+			//printf("could not open cache, attempting to guess total lines\n");
+			//count the number of lines that contain "echo" or "printf"
+			script = fopen(script_location,"r");
+			for (;;){
+				if (feof(script)){
+					break; //stop at end of file
+				}
+				fgets(buffer,BUFFER_SIZE,script);
+				if(strstr(buffer,"echo")){
+					total_lines++;
+				}
 			}
-			fgets(buffer,BUFFER_SIZE,script);
-			if(strstr(buffer,"echo")){
-				total_lines++;
-			}
+			fclose(script);
+			//printf("analysed with result of %d lines detected\n",total_lines);
+			autodetected = 1;
 		}
-		fclose(script);
-		printf("analysed with result of %d lines detected\n",total_lines);
-		autodetected = 1;
 	}
 	for (;;){
 		if (((args.number_other == 0) && (args.number_single == 0)) && (autodetected == 0)){
@@ -68,12 +84,18 @@ int main(int argc, char **argv){
 		}
 		print_line((const char *)buffer);
 	}
+	if (!(cache_exists)){
+		//printf("updating cache...\n");
+		script_cache = fopen(script_cache_location,"w");
+		fprintf(script_cache,"%d",line_count);
+		fclose(script_cache);
+		//printf("done!\n");
+	}
 	free_args(&args);
 	printf("\n"); //make sure to clean up after progress bar
 	return 0;
 }
 void print_line(const char *line){
-	static int line_count = 0;
 	line_count++;
 	printf("\033[2K\r"); //erase existing progress bar
 	printf("%s\n",line);
