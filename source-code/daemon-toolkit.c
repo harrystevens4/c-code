@@ -9,10 +9,16 @@
 #include <arpa/inet.h>
 #include <unistd.h>
 #include <sys/un.h>
-#include "daemon-toolkit.h"
+//#include "daemon-toolkit.h"
 #include <stdlib.h>
 #define END "END" //end of transmition
 #define ACK "ACK" //acknowledgement signal
+
+struct buffer{
+        int buffer_length; //number of strings in the buffer
+        int *lengths; //array of lengths corresponding to strings in buffer (not including null byte)
+        char **buffer; //for storing the buffer of commands to be processed by the daemon
+};
 
 pthread_mutex_t tty_lock;
 volatile int STOP = 0;
