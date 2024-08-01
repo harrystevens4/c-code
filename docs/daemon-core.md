@@ -1,13 +1,17 @@
 
-# How to use `daemon-core.c` and coresponding `daemon-core.h`
+# How to use `daemon-core.c` and corresponding `daemon-core.h`
+
+## Errors
+
+Most of the socket functions, when they experience an error, will print an error to `stdout`, and if critical enough to affect the return value, will `exit(EXIT_FAILURE)`. If this is not desired, the `extern int non_lethal_errors` can be set to 1, and will result in functions returning -1 or null depending on if they return an int or not, allowing better control of error handling.
 
 ## Sockets
 
-To allow inter-process comunication, the `daemon-core.c` provides functions for Unix domain sockets in order to simplify the process. The following functions are provided:
+To allow inter-process communication, the `daemon-core.c` provides functions for Unix domain sockets in order to simplify the process. The following functions are provided:
 
 ### `int make_named_socket(const char *filename)`
 
-This function creates a server socket, bound to the file path specified as a string. It then returns the socket created as an integer. Note: this function only creates and binds the socket. You must set up listening and connection accepting. Note: you are recomended to have the file for the socket in the `/tmp` directory, due to having the property of reseting on restart, ensuring you will not have binding issues after a restart if the socket is not closed properly.
+This function creates a server socket, bound to the file path specified as a string. It then returns the socket created as an integer. Note: this function only creates and binds the socket. You must set up listening and connection accepting. Note: you are recommended to have the file for the socket in the `/tmp` directory, due to having the property of resetting on restart, ensuring you will not have binding issues after a restart if the socket is not closed properly.
 
 Returns 0 on success.
 
@@ -21,7 +25,7 @@ Returns the new data socket as an integer.
 
 This function is for server sockets only, if you wish to close a client socket, use `close(socket)` provided by `unilib.h`. It removes the file used for the socket and closes the connection. Used to clean up after you are done with the server.  
 
-Returns 0 on successfull completion.
+Returns 0 on successful completion.
 
 ### `int send_string(int socket, const char *string)`
 
