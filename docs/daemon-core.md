@@ -38,7 +38,17 @@ Returns 0 on success.
 
 This is the counterpart to `send_string`. It will receive the string one char at a time and dynamicaly allocate a string to hold the final result after putting together the string. Note: you must `free(string)` after use to ensure that memory is not wasted.
 
-Returns a string (`char*`) with the received transmition
+Returns a string (`char*`) with the received transmission
+
+## `int send_int(int socket, int number)`
+
+Sends the integer `number` to the provided socket. Paired with `receive_int` to communicate integers over a socket.
+Returns 0 on success.
+
+### `int receive_int(int socket)`
+
+This function will receive an integer on a provided socket. Similar to `receive_string` except it returns an integer.
+Returns -1 on failure
 
 ## Locks 
 
