@@ -1,0 +1,16 @@
+#!/bin/bash
+#args are description, exec-start exec-stop
+cat << EOF
+[Unit]
+Description=$1
+
+[Service]
+Type=simple
+ExecStart=$2
+ExecStop=$3
+Restart=on-failure
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
+EOF

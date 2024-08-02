@@ -6,5 +6,9 @@ args.o : ../../source-code/args.c ../../source-code/args.h
 	gcc -c ../../source-code/args.c
 mail-manager.o : ../../source-code/mail-manager.c
 	gcc -c ../../source-code/mail-manager.c
-install : mail-manager
+view-mail : view-mail.o daemon-toolkit.o
+	gcc view-mail.o daemon-toolkit.o -lncursesw -o view-mail
+view-mail.o : ../../source-code/view-mail.c
+	gcc -c ../../source-code/view-mail.c
+install : mail-manager view-mail
 	@./install
