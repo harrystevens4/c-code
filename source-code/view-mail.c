@@ -18,6 +18,7 @@ int display_popup(const char *text,const char *tooltip);
 void get_term_info();
 
 int main(){
+	non_lethal_errors = 1;
 	setlocale(LC_ALL,"");//unicode fonts
 	
 	//setting up variables
@@ -42,6 +43,11 @@ int main(){
 	int status;
 	int index = 0;
 	int socket = connect_named_socket("/tmp/mail-manager.socket");
+	if (socket<0){
+		display_popup("Could not connect to mail-manager daemon.","<Press any key to exit>");
+		endwin();
+		return 1;
+	}
 	int delete_socket;
 	char *header;
 	char *body;
