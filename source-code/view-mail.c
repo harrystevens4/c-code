@@ -8,6 +8,10 @@
 #include <ncurses.h> // use -lncursesw when compiling
 #include <curses.h> //for macro definitions
 
+#define CEILING_POS(X) ((X-(int)(X)) > 0 ? (int)(X+1) : (int)(X))
+#define CEILING_NEG(X) (int)(X)
+#define CEILING(X) ( ((X) > 0) ? CEILING_POS(X) : CEILING_NEG(X) )
+
 //defining globals
 volatile int terminal_height;
 volatile int terminal_width;
@@ -162,10 +166,26 @@ int display_popup(const char *text,const char *tooltip){
 	if (y<1){
 		y=1;
 	}
-	if (width>terminal_width-2)
+	//clamp width to terminal width
+	if (width>terminal_width-2){
 		width = terminal_width - 2;
-	if (width>terminal_width-2)
+	}
+	if (width>terminal_width-2){
 		width = terminal_height - 2;
+	}
+	length = 0;
+	for (int i = 0; i < strlen(text); i++){//add extra lines for wraparound text
+		length++;
+		if (text[i] == '\n'){
+			length = 0;
+			continue;
+		}
+		if (length > width-5){
+			length = 0;
+			height++;
+			//printf("clamped\n");
+		}
+	}
 	//make the window
 	unsigned int text_x = x+2;
 	unsigned int text_y = y+1;
@@ -173,12 +193,20 @@ int display_popup(const char *text,const char *tooltip){
 	popup_window = newwin(height,width,y,x);
 	box(popup_window,0,0);
 	wrefresh(popup_window);
+	length = 0;
 	for (int i = 0; i<strlen(text); i++){
 		if (text[i] == '\n'){
 			text_y++;
 			text_x = x+2;
+			length = 0;
 			continue;
 		}
+		if (length > width-5){
+			length = 0;
+			text_x = x+2;
+			text_y++;
+		}
+		length++;
 		mvprintw(text_y,text_x,"%c",text[i]);
 		text_x++;
 	}
