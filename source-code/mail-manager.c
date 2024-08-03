@@ -202,11 +202,22 @@ int start_daemon(){
 	int data_socket;
 	int result = 0;
 	char *buffer;
+	if (access(SOCKET_FD,F_OK) == 0){
+		fprintf(stderr,"Warning: found existing socket. attempting to delete\n");
+		if (remove(SOCKET_FD) == 0){
+			fprintf(stderr,"Warning: old socket deleted\n");
+		}else{
+			fprintf(stderr,ERROR"could not delete old socket\n"ERROR);
+		}
+	}else{
+		printf("Socket not already found, continuing\n");
+	}
 	int server = make_named_socket(SOCKET_FD);
 	if (server < 0){
-		fprintf(stderr,"could not create the server socket\n");
+		fprintf(stderr,ERROR"could not create the server socket\n"ERROR);
 	}
 	listen(server,10);
+	printf("Awaiting connections");
 	while (!stop){
 		close_socket = 1;
 		data_socket = accept(server,NULL,NULL);
