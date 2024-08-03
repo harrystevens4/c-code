@@ -9,11 +9,17 @@ if [ "$EUID" -ne "0" ]; then
 fi
 echo "copying over files..."
 cp "mail-manager" "/usr/local/bin"
+cp "view-mail" "/usr/local/bin"
 if [ "$?" != "0" ]; then
 	echo "Could not copy files over."
 	exit
 fi
 echo "Done"
+echo "Generating systemd unit..."
+./generate-systemd-unit "Mail manager daemon" "/usr/local/bin/mail-manager -fd" "/usr/local/bin/mail-manager -k" > mail-manager.service
+echo "Done"
+echo "Installing unit..."
+cp mail-manager.service /usr/lib/systemd/system
+echo "Done"
 echo "installing all man pages..."
 ../../docs/man/install-man-pages
-
