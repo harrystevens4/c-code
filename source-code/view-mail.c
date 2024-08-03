@@ -22,6 +22,8 @@ int display_popup(const char *text,const char *tooltip);
 void get_term_info();
 
 int main(){
+	int length; //for snprintf and memory allocation
+
 	non_lethal_errors = 1;
 	setlocale(LC_ALL,"");//unicode fonts
 	
@@ -29,7 +31,6 @@ int main(){
 
 	//setting up multi purpose buffers
 	char *buffer;
-	buffer = malloc(sizeof(char)*(terminal_width+1)); //initialise to lise of screen width
 
 	//init ncurses related things
 	initscr();
@@ -76,8 +77,10 @@ int main(){
 		receive_string(socket,&body);
 
 		//create popup
-		full_mail = malloc((strlen(body)+strlen(header)+2)*sizeof(char));
-		sprintf(full_mail,"%s\n-----\n%s",header,body);
+		length = snprintf((char*)NULL,0,"%s\n-----\n%s",header,body)+1;//find length of required buffer
+		full_mail = malloc(length*sizeof(char));
+		snprintf(full_mail,length,"%s\n-----\n%s",header,body);
+		printf("%d | %s",length,full_mail);
 		clear();
 		refresh();
 		mvprintw(0,(int)((terminal_width/2)-4),"⇐ %d/%d ⇒",index+1,mail_count);
@@ -125,7 +128,6 @@ int main(){
 
 	//cleanup
 	close(socket);
-	free(buffer);
 	endwin();
 	return 0;
 }
