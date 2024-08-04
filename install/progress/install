@@ -1,1 +1,7 @@
-echo "starting install..."
+#!/bin/bash
+if [ "$EUID" != "0" ]; then
+	echo "this program must be run as root"
+fi
+echo "copying files..."
+cp progress /usr/local/bin
+echo "installed"

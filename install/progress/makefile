@@ -6,6 +6,6 @@ shell-toolkit.o : ../../source-code/shell-toolkit.h ../../source-code/shell-tool
 	gcc -c ../../source-code/shell-toolkit.c
 args.o : ../../source-code/args.c ../../source-code/args.h
 	gcc -c ../../source-code/args.c
-install : progress
+install : progress 
 	@./install | ./progress
 
