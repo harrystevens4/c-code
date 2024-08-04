@@ -47,9 +47,9 @@ char *get_calling_process_executable(){
 	//check if connected to pipe
 	if (connected_pipe_output()){//detect if we should get other side of pipe or parent pid
 		pid = getpgrp();//magic command to get the other side of the pipes pid             
-		printf("using parent group id\n");
+		//printf("using parent group id\n");
 	}else{
-		printf("using parent pid\n");
+		//printf("using parent pid\n");
 		pid = getppid();
 	}
 	//attempt to find the executable location corresponding to the pid
