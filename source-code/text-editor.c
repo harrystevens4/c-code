@@ -63,9 +63,11 @@ int main(int argc, char** argv){
 			break;
 		}else if(ch == KEY_BACKSPACE){//handling deleting chars
 			if (document_length-1 >= 0 && cursor_position > 0){ //check its legal to backspace
+				for (int i = cursor_position-1; i < document_length; i++){//shuffling characters backwards in the array
+					document[i] = document[i+1];
+				}
 				document_length--;
 				cursor_position--;
-				document[document_length] = '\0';
 				document = realloc(document,sizeof(char)*(document_length+1));
 			}
 		}else if(ch == KEY_LEFT){//navigating with arrow keys
@@ -126,7 +128,7 @@ int render_cursor(){
 		cursor_x++;
 		if (document[i] == '\n' || cursor_x >= COLS-2){//detect when newline and also when text starts to wrap
 			line++;
-			if (line >= line_offset){//find where the text shown on screen starts
+			if (line > line_offset){//find where the text shown on screen starts
 				cursor_y++;
 			}
 			cursor_x = 0;
