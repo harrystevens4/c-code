@@ -10,12 +10,15 @@ WINDOW *popup;//for popups like the save dialogue and quit dialogue
 char *document; //holds all the chars in the document
 int document_length;
 int cursor_position; //position in document string
+int line_offset;//how many lines are not shown above the visible text
 FILE *open_file;
+int cursor_x = 0;//physical x coord
+int cursor_y = 0;//physical y coord
 
 void display_status_bar();
 void render_screen();
 void render_text();
-void render_cursor();
+int render_cursor();
 int quit_dialogue();
 int load_file(char *filename);
 
@@ -114,13 +117,18 @@ void display_status_bar(){
 	mvprintw(0,2,buffer);//print the status line
 	free(buffer);
 }
-void render_cursor(){
-	int cursor_x = 0;//physical x coord
-	int cursor_y = 0;//physical y coord
+int render_cursor(){
+	cursor_y = 0;
+	cursor_x = 0;
+	int line = 0;
+
 	for (int i = 0; i < cursor_position; i++){//figure out how many newlines there are
 		cursor_x++;
 		if (document[i] == '\n' || cursor_x >= COLS-2){//detect when newline and also when text starts to wrap
-			cursor_y++;
+			line++;
+			if (line >= line_offset){//find where the text shown on screen starts
+				cursor_y++;
+			}
 			cursor_x = 0;
 		}
 	}
@@ -130,19 +138,57 @@ void render_cursor(){
 void render_text(){
 	int y = 0;
 	int x = 0;
+	int line = 0;
+	int line_count;
+	int extra_offset = 0;
+	int negative_offset = 0; //POSITIVE number containing number of lines to be removed from the offset
+	int i = 0;
+
+	//check cursor position is on screen and if not ofset screen to ensure it is
+	line_count = 0;
+	for (i = 0; i < cursor_position; i++){
+		if (document[i] == '\n' || x >= COLS-2){
+			line++;
+			x = 0;
+			if (line <= line_offset){
+				continue;
+			}
+			line_count++;
+			if (line_count >= LINES-2){
+				extra_offset++;
+			}
+		}
+		x++;
+	}
+	negative_offset = line_offset-line-1;
+	if (negative_offset < 0){
+		negative_offset = 0;
+	}
+	extra_offset -= negative_offset;
+	//mvprintw(0,40,"%d    ",extra_offset);
+	line_offset += extra_offset;
+
+	x = 0;
+	line = 0;
+
 	wclear(text);
 	for (int i = 0; i < document_length; i++){
 		if (document[i] == '\n'){//carrage return and newline when newline char found
-			y++;
-			x = 0;
+			line++;
+			if (line > line_offset){//dont newline if we havent reacher the offset yet
+				y++;
+				x = 0;
+			}
 			continue;
 		}
-		if (x >= COLS-2){//detect if the text would go ofscreen and wrap it round
-			y++;
-			x = 0;
+		if (line >= line_offset){//dont print yet if we havent reached the desired offset
+			if (x >= COLS-2){//detect if the text would go ofscreen and wrap it round
+				y++;
+				x = 0;
+			}
+			mvwprintw(text,y,x,"%c",document[i]);//print each char individualy
+			x++;
 		}
-		mvwprintw(text,y,x,"%c",document[i]);//print each char individualy
-		x++;
 	}
 	render_cursor();
 }
