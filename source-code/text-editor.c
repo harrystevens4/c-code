@@ -10,14 +10,16 @@ WINDOW *popup;//for popups like the save dialogue and quit dialogue
 char *document; //holds all the chars in the document
 int document_length;
 int cursor_position; //position in document string
+FILE *open_file;
 
 void display_status_bar();
 void render_screen();
 void render_text();
 void render_cursor();
 int quit_dialogue();
+int load_file(char *filename);
 
-int main(){
+int main(int argc, char** argv){
 	//setting globals
 	snprintf(filename,MAX_BUFFER,"new");//set default filename for when one is not opened
 	int ch;
@@ -25,6 +27,13 @@ int main(){
 	document = malloc(sizeof(char));
 	document[0] = '\0';
 
+	//load a file if requested
+	if (argc > 1){
+		printf("Loading file...\n");
+		load_file(argv[1]);
+	}
+
+	//ncurses setup
 	setlocale(LC_ALL,"");//important for displaying the unicode characters
 	initscr();
 
@@ -94,7 +103,6 @@ int main(){
 	free(document);
 	delwin(text);
 	endwin();
-	printf("%d %d\n",LINES,COLS);
 }
 void display_status_bar(){
 	//print logo and any other info
@@ -149,4 +157,30 @@ void render_screen(){
 	render_text();
 }
 int quit_dialogue(){//return 1 for quit and 0 for cancel
+}
+int load_file(char *filename){
+	char char_buffer;
+
+	//check file can be opened and open it
+	open_file = fopen(filename,"r");
+	if (open_file == NULL){
+		return 1;
+	}
+
+	//remove existing content of document ready for new content
+	free(document);
+	document = malloc(sizeof(char));
+	document_length = 0;
+
+	//read the file
+	for (;;){
+		char_buffer = fgetc(open_file);
+		document = realloc(document,sizeof(char)*(document_length+1));
+		if (feof(open_file)){//leave loop when end of file reached
+			break;
+		}
+		document[document_length] = char_buffer;
+		document_length++;
+	}
+	document[document_length] = '\0';
 }
