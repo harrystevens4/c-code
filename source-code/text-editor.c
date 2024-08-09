@@ -6,7 +6,6 @@
 #define MAX_BUFFER 1024
 char filename[MAX_BUFFER];
 WINDOW *text;
-WINDOW *popup;//for popups like the save dialogue and quit dialogue
 char *document; //holds all the chars in the document
 int document_length;
 int cursor_position; //position in document string
@@ -14,6 +13,7 @@ int line_offset;//how many lines are not shown above the visible text
 FILE *open_file;
 int cursor_x = 0;//physical x coord
 int cursor_y = 0;//physical y coord
+int unsaved = 0;
 
 void display_status_bar();
 void render_screen();
@@ -60,7 +60,9 @@ int main(int argc, char** argv){
 		ch = getch();
 		//keybind logic
 		if (ch == 3){//ctrl-c
-			break;
+			if (quit_dialogue()){
+				break;
+			}
 		}else if(ch == KEY_BACKSPACE){//handling deleting chars
 			if (document_length-1 >= 0 && cursor_position > 0){ //check its legal to backspace
 				for (int i = cursor_position-1; i < document_length; i++){//shuffling characters backwards in the array
@@ -69,6 +71,7 @@ int main(int argc, char** argv){
 				document_length--;
 				cursor_position--;
 				document = realloc(document,sizeof(char)*(document_length+1));
+				unsaved = 1;
 			}
 		}else if(ch == KEY_LEFT){//navigating with arrow keys
 			if (cursor_position > 0){//check we are not at the beginning
@@ -104,6 +107,7 @@ int main(int argc, char** argv){
 			cursor_position++;
 			document[cursor_position-1] = (char)ch;
 			document[document_length] = '\0';
+			unsaved = 1;
 		}
 		//mvprintw(2,1,"%c:document length %d, reallocating to %d bytes, adding char %c",(char)ch,document_length,(sizeof(char)*(document_length+1)),document[document_length-1]);
 		render_text();
@@ -209,6 +213,41 @@ void render_screen(){
 	render_text();
 }
 int quit_dialogue(){//return 1 for quit and 0 for cancel
+	if (unsaved){
+		int selected = 0;
+		int width = 35;
+		int height = 4;
+		int x = COLS/2 - (width/2);
+		int y = LINES/2 - (height/2);
+		int ch;
+		WINDOW *popup;
+		popup = newwin(height,width,y,x);//fixed size due to always displaying the same
+		box(popup,0,0);
+		mvwprintw(popup,1,2,"Quit? There are unsaved changes");
+		mvwprintw(popup,2,8,">Cancel");mvwprintw(popup,2,19," Quit");
+		curs_set(0);
+		wrefresh(popup);
+		while (1){
+			ch = getch();
+			if (ch == '\n'){
+				break;
+			}else if (ch == KEY_LEFT){
+				selected = 0;
+				mvwprintw(popup,2,8,">Cancel");mvwprintw(popup,2,19," Quit");
+			}else if (ch == KEY_RIGHT){
+				selected = 1;
+				
+				mvwprintw(popup,2,8," Cancel");mvwprintw(popup,2,19,">Quit");
+			}
+			wrefresh(popup);
+		}
+		curs_set(1);
+		delwin(popup);
+		render_screen();
+		return selected;
+	}else{
+		return 1;
+	}
 }
 int load_file(char *filename){
 	char char_buffer;
