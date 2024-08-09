@@ -83,7 +83,7 @@ int main(){
 		printf("%d | %s",length,full_mail);
 		clear();
 		refresh();
-		mvprintw(0,(int)((terminal_width/2)-4),"⇐ %d/%d ⇒",index+1,mail_count);
+		mvprintw(0,(int)((terminal_width/2)-4),"< %d/%d >",index+1,mail_count);
 		key = display_popup((const char *)full_mail,"<next>");
 
 		//cleanup before next transmition
