@@ -64,6 +64,22 @@ int main(){
 			if (cursor_position < document_length){//check we dont overspill
 				cursor_position++;
 			}
+		}else if(ch == KEY_UP){
+			do {
+				if (cursor_position < 1){
+					break;
+				}
+				cursor_position--;
+			}
+			while (document[cursor_position] != '\n');
+		}else if(ch == KEY_DOWN){
+			do {
+				if (cursor_position >= document_length){
+					break;
+				}
+				cursor_position++;
+			}
+			while (document[cursor_position] != '\n');
 		}else{
 			document_length++;
 			cursor_position++;
