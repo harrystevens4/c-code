@@ -1,4 +1,4 @@
-all : systemd-controller
+install : systemd-controller
 	cp systemd-controller /usr/local/sbin
 systemd-controller : systemd-controller.o
 	gcc systemd-controller.o -o systemd-controller -lncursesw
