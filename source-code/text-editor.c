@@ -95,9 +95,13 @@ int main(int argc, char** argv){
 			}
 			while (document[cursor_position] != '\n');
 		}else{
+			//shuffle array elements to make room
 			document_length++;
-			cursor_position++;
 			document = realloc(document,sizeof(char)*(document_length+1));
+			for (int i = document_length; i > cursor_position; i--){
+				document[i] = document[i-1];
+			}
+			cursor_position++;
 			document[cursor_position-1] = (char)ch;
 			document[document_length] = '\0';
 		}
