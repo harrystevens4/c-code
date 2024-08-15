@@ -3,6 +3,7 @@
 #include <ncurses.h>
 #include <locale.h>
 #include <unistd.h>
+#include <string.h>
 #define MAX_BUFFER 1024
 char filename[MAX_BUFFER];
 WINDOW *text;
@@ -20,7 +21,9 @@ void render_screen();
 void render_text();
 int render_cursor();
 int quit_dialogue();
+int save_dialogue();
 int load_file(char *filename);
+int save_file();
 
 int main(int argc, char** argv){
 	//setting globals
@@ -63,6 +66,9 @@ int main(int argc, char** argv){
 			if (quit_dialogue()){
 				break;
 			}
+		}else if (ch == 19){
+			save_dialogue();
+			render_screen();
 		}else if(ch == KEY_BACKSPACE){//handling deleting chars
 			if (document_length-1 >= 0 && cursor_position > 0){ //check its legal to backspace
 				for (int i = cursor_position-1; i < document_length; i++){//shuffling characters backwards in the array
@@ -174,7 +180,7 @@ void render_text(){
 	if (negative_offset < 0){
 		negative_offset = 0;
 	}
-	mvprintw(0,20,"negative_offset %d",negative_offset);
+	//mvprintw(0,20,"negative_offset %d",negative_offset);
 	line_offset += extra_offset - negative_offset;
 
 	x = 0;
@@ -273,4 +279,78 @@ int load_file(char *filename){
 		document_length++;
 	}
 	document[document_length] = '\0';
+	fclose(open_file);
+	return 0;
+}
+int save_dialogue(){//return 0 for save and 1 for cancel
+	char filename_buffer[MAX_BUFFER];
+	char buffer[MAX_BUFFER];
+	int selected = 0;
+	int width = 35;
+	int height = 4;
+	int x = COLS/2 - (width/2);
+	int y = LINES/2 - (height/2);
+	int ch;
+	
+	snprintf(filename_buffer,MAX_BUFFER,"%s",filename);
+
+	WINDOW *popup;
+	popup = newwin(height,width,y,x);//fixed size due to always displaying the same
+	box(popup,0,0);
+	mvwprintw(popup,1,2,"Save as:");
+	mvwprintw(popup,1,11,"%s",filename_buffer);
+	mvwprintw(popup,2,2,">Save");mvwprintw(popup,2,8," Cancel");
+	mvwprintw(popup,1,11+strlen(filename_buffer),"\0");
+	wrefresh(popup);
+	while (1){
+		ch = getch();
+		if (ch == '\n'){
+			break;
+		}else if (ch == KEY_LEFT){
+			selected = 0;
+			mvwprintw(popup,2,2,">Save");mvwprintw(popup,2,8," Cancel");
+		}else if (ch == KEY_RIGHT){
+			selected = 1;
+			
+			mvwprintw(popup,2,2," Save");mvwprintw(popup,2,8,">Cancel");
+		}else if (ch == KEY_BACKSPACE){
+			filename_buffer[strlen(filename_buffer)-1] = '\0';
+			//clear deleted char from screen
+			mvwprintw(popup,1,11+strlen(filename_buffer)," ");
+		}else if(1){
+			snprintf(buffer,MAX_BUFFER,"%s",filename_buffer);
+			snprintf(filename_buffer,MAX_BUFFER,"%s%c",buffer,ch);
+		}
+
+		mvwprintw(popup,1,11,"%s",filename_buffer);
+		//render cursor
+		mvwprintw(popup,1,11+strlen(filename_buffer),"\0");
+
+		wrefresh(popup);
+	}
+	delwin(popup);
+	render_screen();
+	snprintf(filename,MAX_BUFFER,"%s",filename_buffer);
+	return selected;
+}
+
+int save_file(char *filename){
+	char buffer;
+
+	//preparing the file
+	open_file = fopen(filename,"w");
+	if (open_file == NULL){
+		return 1;
+	}
+
+	//writing to it
+	for (int i = 0;i<document_length;i++){
+		buffer = document[document_length];
+		fputc(buffer,open_file);
+	}
+
+	//cleanup
+	fclose(open_file);
+	return 0;
+	unsaved = 0;
 }
