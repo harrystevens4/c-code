@@ -67,7 +67,16 @@ int main(int argc, char** argv){
 				break;
 			}
 		}else if (ch == 19){
-			save_dialogue();
+			if (save_dialogue() == 0){//check the user hits save and not cancel
+				if (save_file(filename) == 1){
+					WINDOW *popup = newwin(3,10,(LINES/2-1),(COLS/2-5));
+					box(popup,0,0);
+					wrefresh(popup);
+					//wait for keyboard input to dismiss popup
+					getch();
+					delwin(popup);
+				}
+			}
 			render_screen();
 		}else if(ch == KEY_BACKSPACE){//handling deleting chars
 			if (document_length-1 >= 0 && cursor_position > 0){ //check its legal to backspace
@@ -344,13 +353,10 @@ int save_file(char *filename){
 	}
 
 	//writing to it
-	for (int i = 0;i<document_length;i++){
-		buffer = document[document_length];
-		fputc(buffer,open_file);
-	}
+	fprintf(open_file,"%s\n",document);//leave trailing newline
 
 	//cleanup
 	fclose(open_file);
-	return 0;
 	unsaved = 0;
+	return 0;
 }
