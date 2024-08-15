@@ -170,13 +170,12 @@ void render_text(){
 		}
 		x++;
 	}
-	negative_offset = line_offset-line-1;
+	negative_offset = line_offset-line;
 	if (negative_offset < 0){
 		negative_offset = 0;
 	}
-	extra_offset -= negative_offset;
-	//mvprintw(0,40,"%d    ",extra_offset);
-	line_offset += extra_offset;
+	mvprintw(0,20,"negative_offset %d",negative_offset);
+	line_offset += extra_offset - negative_offset;
 
 	x = 0;
 	line = 0;
