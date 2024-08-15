@@ -1,0 +1,21 @@
+#!/bin/bash
+tick (){
+	if [ "$?" == "0" ]; then
+		echo -e "\r[/"
+	else
+		echo -e "\r[x"
+		exit 1
+	fi
+}
+echo "[/] = success, [x] = failure"
+echo -n "[ ] checking if run as root user..."
+if [ "$EUID" -ne "0" ]; then
+	echo "a" | grep -q "b"
+fi
+tick
+echo -n "[ ] copying binary to /usr/bin..."
+cp rufus-text /usr/bin
+tick
+echo -n "[ ] installing man pages..."
+../../docs/man/install-man-pages > /dev/null
+tick
