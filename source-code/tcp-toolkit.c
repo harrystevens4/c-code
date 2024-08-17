@@ -108,3 +108,53 @@ int connect_server_socket(char * host, char * port){
 
 	return socket;
 }
+int sendall(int socket, char * buffer, size_t buffer_length){
+	int bytes_sent = 0;
+	int total_bytes_sent = 0;
+
+	if (verbose_tcp_toolkit){
+		printf("[tcp-toolkit/sendall]: Sending buffer size...\n");
+	}
+	if (send(socket, (void *)buffer_length, sizeof(size_t), 0) < 0){//tell receiver how many bytes to expect
+		fprintf(stderr,"ERROR [tcp-toolkit/sendall]: Could not send data size.\n");
+		perror("send");
+		return -1;
+	}
+	if (verbose_tcp_toolkit){
+		printf("[tcp-toolkit/sendall]: Sent buffer size.\n");
+	}
+
+	do{
+		bytes_sent = send(socket, buffer, buffer_length, 0);
+		if (verbose_tcp_toolkit){
+			printf("[tcp-toolkit/sendall]: sent %d/%d bytes\n",bytes_sent,buffer_length);
+		}
+		if (bytes_sent < 0){
+			fprintf(stderr,"ERROR [tcp-toolkit/sendall]: Could not send data.\n");
+			perror("send");
+			return -1;
+		}
+		//shuffle pointer on to untransmitted section
+		buffer += bytes_sent;
+		buffer_length -= bytes_sent;
+	}while (total_bytes_sent < buffer_length);
+	if (verbose_tcp_toolkit){
+		printf("[tcp-toolkit/sendall]: Finnished sending data.\n");
+	}
+	return 0;
+}
+size_t recvall(int socket,char **buffer){
+	size_t *buffer_size;
+	char * data_buffer;
+	int bytes_received = 0;
+	*buffer = malloc(*buffer_size);
+	if (recv(socket,buffer_size,sizeof(size_t),0) < 0){
+		fprintf(stderr,"ERROR [tcp-toolkit/recvall]: Could not receive buffer size.\n");
+		perror("recv");
+		return 0;//returning a size_t which is unsigned
+	}
+	do{
+		bytes_received = recv(socket,buffer+bytes_received,1024,0);
+	}while (bytes_received < *buffer_size);
+	return *buffer_size;
+}
