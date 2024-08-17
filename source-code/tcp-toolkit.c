@@ -157,9 +157,11 @@ int sendall(int socket, char * buffer, size_t buffer_length){
 	return 0;
 }
 size_t recvall(int socket,char **buffer){
+	unsigned short packet_size = 1024;
 	size_t buffer_size;
 	char * data_buffer;
 	int bytes_received = 0;
+	int total_bytes_received = 0;
 	if (verbose_tcp_toolkit){
 		printf("[tcp-toolkit/recvall]: Receiving buffer size...\n");
 	}
@@ -176,11 +178,16 @@ size_t recvall(int socket,char **buffer){
 		if (verbose_tcp_toolkit){
 			printf("[tcp-toolkit/recvall]: Receiving packet...\n");
 		}
-		bytes_received = recv(socket,(*buffer)+bytes_received,1024,0);
+		bytes_received = recv(socket,(*buffer)+total_bytes_received,packet_size,0);
+		if (bytes_received == 0){
+			fprintf(stderr,"ERROR [tcp-toolkit/recvall]: Connection closed before transmition completed.\n");
+			return 0;
+		}
 		if (verbose_tcp_toolkit){
 			printf("[tcp-toolkit/recvall]: Got packet of size %d.\n",bytes_received);
 		}
-	}while (bytes_received < buffer_size);
+		total_bytes_received += bytes_received;
+	}while (total_bytes_received < buffer_size);
 	if (verbose_tcp_toolkit){
 		printf("[tcp-toolkit/recvall]: Finnished receiving data.\n");
 	}
