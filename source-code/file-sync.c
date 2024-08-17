@@ -5,6 +5,7 @@
 #include "args.h"
 
 #define PORT "8173"
+#define BUFFER_MAX 1024
 
 int server(); //server holds and sends files to clients
 int client(); //receives files from the server
@@ -27,9 +28,10 @@ int main(int argc, char **argv){
 int server(){
 	int client;
 	int server;
+	char *buffer;
 
-	struct sockaddr *client_addr;
-	socklen_t *client_addrlen;
+	struct sockaddr client_addr;
+	socklen_t client_addrlen = sizeof(client_addr);
 
 	printf("server mode selected\n");
 	server = make_server_socket(PORT, 10);//create socket, bind and start listening
@@ -37,11 +39,19 @@ int server(){
 		fprintf(stderr,"ERROR: Could not start server socket.\n");
 		return -1;
 	}
-	client = accept(server,client_addr,client_addrlen);
+	client = accept(server,&client_addr,&client_addrlen);
+	if (client < 0){
+		fprintf(stderr,"ERROR: Could not accept connection.\n");
+		perror("accept");
+		return -1;
+	}
 	printf("connection accepted.\n");
+	recvall(client,&buffer);
+	printf("got message %s\n",buffer);
 
 	//cleanup
 	close(client);
+	return 0;
 }
 
 int client(){
@@ -57,4 +67,10 @@ int client(){
 		return -1;
 	}
 	printf("Connection accepted.\n");
+	
+	sendall(server,"epic",5);
+
+	//cleaing
+	close(server);
+	return 0;
 }
