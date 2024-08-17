@@ -30,8 +30,8 @@ int server(){
 	int server;
 	char *buffer;
 
-	struct sockaddr client_addr;
-	socklen_t client_addrlen = sizeof(client_addr);
+	struct sockaddr_storage client_addr;
+	socklen_t client_addrlen;
 
 	printf("server mode selected\n");
 	server = make_server_socket(PORT, 10);//create socket, bind and start listening
@@ -39,7 +39,8 @@ int server(){
 		fprintf(stderr,"ERROR: Could not start server socket.\n");
 		return -1;
 	}
-	client = accept(server,&client_addr,&client_addrlen);
+	client_addrlen = sizeof(client_addr);
+	client = accept(server,(struct sockaddr *)&client_addr,&client_addrlen);
 	if (client < 0){
 		fprintf(stderr,"ERROR: Could not accept connection.\n");
 		perror("accept");

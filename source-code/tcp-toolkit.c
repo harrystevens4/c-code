@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <arpa/inet.h>
 #include <string.h>
 #include <netdb.h>
 #include <netinet/in.h>
@@ -20,7 +21,9 @@ int make_socket(const char * host ,const char * port, struct addrinfo **res){
 	memset(&hints, 0, sizeof(hints));//set to zero
 
 	//fill in hints for getaddrinfo()
-	hints.ai_flags = AI_PASSIVE; //fill in our ip
+	if (host == NULL){
+		hints.ai_flags = AI_PASSIVE; //fill in our ip
+	}
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM; //byte order matters
 
@@ -88,6 +91,9 @@ int make_server_socket(const char * port, int backlog){
 	return socket;
 }
 int connect_server_socket(char * host, char * port){
+	char server_ip_address[1024];
+	void *addr;
+	struct addrinfo *p;
 	struct addrinfo *res;
 	int socket = make_socket(host, port, &res);
 	if (socket < 0){
@@ -97,15 +103,22 @@ int connect_server_socket(char * host, char * port){
 	if (verbose_tcp_toolkit){
 		printf("[tcp-toolkit/connect_server_socket]: Attempting to connect...\n");
 	}
-	if (connect(socket,res->ai_addr, res->ai_addrlen) < 0){
+	if (connect(socket,res->ai_addr, res->ai_addrlen) < 0){//something is going wrong
 		fprintf(stderr,"ERROR [tcp-toolkit/connect_server_socket]: Could not connect.\n");
 		perror("connect");
 		return -1;
+	}
+	for (p = res; p != NULL; p = p->ai_next){
+		struct sockaddr_in *ipv4 = (struct sockaddr_in *)p->ai_addr;
+		addr = &(ipv4->sin_addr);
+		inet_ntop(p->ai_family, addr, server_ip_address, sizeof(server_ip_address));
+		printf("[tcp-toolkit/connect_server_socket]: Connected to %s\n");
 	}
 	if (verbose_tcp_toolkit){
 		printf("[tcp-toolkit/connect_server_socket]: Connection successful\n");
 	}
 
+	freeaddrinfo(res);
 	return socket;
 }
 int sendall(int socket, char * buffer, size_t buffer_length){
@@ -115,7 +128,7 @@ int sendall(int socket, char * buffer, size_t buffer_length){
 	if (verbose_tcp_toolkit){
 		printf("[tcp-toolkit/sendall]: Sending buffer size...\n");
 	}
-	if (send(socket, (void *)buffer_length, sizeof(size_t), 0) < 0){//tell receiver how many bytes to expect
+	if (send(socket, &buffer_length, sizeof(size_t), 0) < 0){//tell receiver how many bytes to expect
 		fprintf(stderr,"ERROR [tcp-toolkit/sendall]: Could not send data size.\n");
 		perror("send");
 		return -1;
@@ -144,17 +157,32 @@ int sendall(int socket, char * buffer, size_t buffer_length){
 	return 0;
 }
 size_t recvall(int socket,char **buffer){
-	size_t *buffer_size;
+	size_t buffer_size;
 	char * data_buffer;
 	int bytes_received = 0;
-	*buffer = malloc(*buffer_size);
-	if (recv(socket,buffer_size,sizeof(size_t),0) < 0){
+	if (verbose_tcp_toolkit){
+		printf("[tcp-toolkit/recvall]: Receiving buffer size...\n");
+	}
+	if (recv(socket,&buffer_size,sizeof(size_t),0) < 0){
 		fprintf(stderr,"ERROR [tcp-toolkit/recvall]: Could not receive buffer size.\n");
 		perror("recv");
 		return 0;//returning a size_t which is unsigned
 	}
+	if (verbose_tcp_toolkit){
+		printf("[tcp-toolkit/recvall]: Got buffer size of %d\n",buffer_size);
+	}
+	*buffer = malloc(buffer_size);
 	do{
-		bytes_received = recv(socket,buffer+bytes_received,1024,0);
-	}while (bytes_received < *buffer_size);
-	return *buffer_size;
+		if (verbose_tcp_toolkit){
+			printf("[tcp-toolkit/recvall]: Receiving packet...\n");
+		}
+		bytes_received = recv(socket,(*buffer)+bytes_received,1024,0);
+		if (verbose_tcp_toolkit){
+			printf("[tcp-toolkit/recvall]: Got packet of size %d.\n",bytes_received);
+		}
+	}while (bytes_received < buffer_size);
+	if (verbose_tcp_toolkit){
+		printf("[tcp-toolkit/recvall]: Finnished receiving data.\n");
+	}
+	return buffer_size;
 }
