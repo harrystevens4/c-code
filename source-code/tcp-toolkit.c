@@ -89,7 +89,7 @@ int make_server_socket(const char * port, int backlog){
 }
 int connect_server_socket(char * host, char * port){
 	struct addrinfo *res;
-	int socket = make_socket(NULL, port, &res);
+	int socket = make_socket(host, port, &res);
 	if (socket < 0){
 		fprintf(stderr, "ERROR [tcp-toolkit/connect_server_socket]: could not make the socket\n");
 		return -1;

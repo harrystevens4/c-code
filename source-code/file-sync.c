@@ -4,7 +4,7 @@
 #include "tcp-toolkit.h"
 #include "args.h"
 
-#define PORT "1173"
+#define PORT "8173"
 
 int server(); //server holds and sends files to clients
 int client(); //receives files from the server
@@ -51,7 +51,7 @@ int client(){
 	socklen_t *client_addrlen;
 
 	printf("client mode selected\n");
-	server = connect_server_socket(NULL,PORT);
+	server = connect_server_socket("192.168.1.239",PORT);
 	if (server < 0){
 		fprintf(stderr,"ERROR: Could not connect.\n");
 		return -1;
