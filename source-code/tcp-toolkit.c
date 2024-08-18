@@ -112,7 +112,9 @@ int connect_server_socket(char * host, char * port){
 		struct sockaddr_in *ipv4 = (struct sockaddr_in *)p->ai_addr;
 		addr = &(ipv4->sin_addr);
 		inet_ntop(p->ai_family, addr, server_ip_address, sizeof(server_ip_address));
-		printf("[tcp-toolkit/connect_server_socket]: Connected to %s\n");
+		if (verbose_tcp_toolkit){
+			printf("[tcp-toolkit/connect_server_socket]: Connected to %s\n");
+		}
 	}
 	if (verbose_tcp_toolkit){
 		printf("[tcp-toolkit/connect_server_socket]: Connection successful\n");
