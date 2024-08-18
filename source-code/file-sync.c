@@ -2,10 +2,12 @@
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
+#include <linux/limits.h>
 #include <sys/socket.h>
 #include "tcp-toolkit.h"
 #include "args.h"
 
+#define USAGE "Usage:\n	-c : client mode\n	-s <config file>: server mode\n"
 #define PORT "8173"
 #define BUFFER_MAX 1024
 #define KILL "stop running now"
@@ -13,20 +15,33 @@
 #define CONFIRM "sure"
 #define COMPLETE_HANDSHAKE "hi"
 #define READY "im ready now"
+#define SENDING_FILE "im about to send a file"
 
 int active = 1;
 int verbose = 0;
+
+char config_filename[PATH_MAX];
 
 int server(); //server holds and sends files to clients
 int client(); //receives files from the server
 
 int main(int argc, char **argv){
 	verbose_tcp_toolkit = 0;//output from tcp toolkit funcitons
+	verbose = 1;
 	struct args args;
 	parse_args(argc,argv,&args);
+	if (args.number_single < 1){
+		printf(USAGE);
+		return -1;
+	}
 	printf("starting...\n");
 	switch (args.single[0]){
 		case 's':
+			if (args.number_other < 1 || access(args.other[0], F_OK) != 0){
+				printf("Please specify the config file.\n"USAGE);
+				return -1;
+			}
+			snprintf(config_filename,PATH_MAX,"%s",args.other[0]);
 			return server();
 		case 'c':
 			return client();
@@ -36,10 +51,15 @@ int main(int argc, char **argv){
 }
 
 int server(){
+	FILE *config_file;
 	int client;
 	int server;
 	char *buffer;
 	size_t buffer_size;
+	int not_done = 1;
+	char line_buffer[PATH_MAX];
+	char char_buffer;
+	int result = 0;
 
 	struct sockaddr_storage client_addr;
 	socklen_t client_addrlen;
@@ -51,7 +71,7 @@ int server(){
 		return -1;
 	}
 	client_addrlen = sizeof(client_addr);
-	while (active){
+	while (active){// dealing with clients mainloop
 		client = accept(server,(struct sockaddr *)&client_addr,&client_addrlen);
 		if (client < 0){
 			fprintf(stderr,"ERROR: Could not accept connection.\n");
@@ -72,11 +92,80 @@ int server(){
 
 		}else{
 			fprintf(stderr,"ERROR: Received unexpected confirmation message of %s with buffer size of %d compared to expected %d.\n",buffer, buffer_size, strlen(START_HANDSHAKE)+1);
+			close(client);
+			free(buffer);
+			continue;
 		}
 		free(buffer);
 		buffer_size = recvall(client,&buffer); //confirmation
-		printf("(Client)> %s",buffer);
+		if (buffer_size < 1){
+			fprintf(stderr,"ERROR: No confirmation sent.\n");
+			free(buffer);
+			close(client);
+			return -1;
+		}
+		printf("(Client)> %s\n",buffer);
 		free(buffer);
+
+		if (verbose){
+			printf("reading config file...\n");
+		}
+		
+		config_file = fopen(config_filename,"r");
+		if (config_file == NULL){
+			fprintf(stderr,"ERROR: Could not open config file.");
+			not_done = 0;//skip reading the config
+		}
+		while (not_done){
+			line_buffer[0] = '\0';
+			for (int i = 0;;i++){//read untill newline and increment i
+				int not_comment = 1;
+				char_buffer = fgetc(config_file);
+				if (feof(config_file)){
+					not_done = 0;
+					break;
+				}
+				if (char_buffer == '\n'){//break at newlines
+					break;
+				}
+				if (char_buffer == '#'){
+					not_comment = 0;
+				}
+				if (i < PATH_MAX-1 && not_comment){//check there is space
+					line_buffer[i] = char_buffer;
+				}
+				line_buffer[i+1] = '\0';
+			}
+			if (line_buffer[0] == '\0'){
+				continue;//dont use empty lines
+			}
+			if (verbose){
+				printf("got line %s\n",line_buffer);
+			}
+			if (access(line_buffer,F_OK) == 0){
+				//tell client to expect a file
+				printf("(Server)> %s\n",SENDING_FILE);
+				result = sendall(client,SENDING_FILE,strlen(SENDING_FILE)+1);
+				if (result < 0){
+					fprintf(stderr, "ERROR: Could not inform client of incoming file.\n");
+					close(client);
+					return -1;
+				}
+				buffer_size = recvall(client,&buffer);
+				printf("(Client)> %s\n",buffer);
+				if (buffer_size < 1){
+					fprintf(stderr, "ERROR: Client disconnected.\n");
+					close(client);
+					return -1;
+				}
+				//start file transmition
+				send_file(client,line_buffer);
+			}else{
+				fprintf(stderr,"ERROR: config file: file [%s] not found.\n",line_buffer);
+			}
+		}
+		fclose(config_file);//clean it up
+
 		if (verbose){
 			printf("sending kill message...\n");
 		}
@@ -85,16 +174,17 @@ int server(){
 		recvall(client,&buffer);
 		printf("(Client)> %s\n",buffer);
 		free(buffer);
+		close(client);
 		active = 0;
 		//printf("sending file...\n",buffer);
 	}
 
 	//cleanup
-	close(client);
 	return 0;
 }
 
 int client(){
+	int result = 0;
 	int server;
 	char *buffer;
 	size_t buffer_length = 0;
@@ -132,6 +222,10 @@ int client(){
 
 	while (active){
 		buffer_length = recvall(server,&buffer);
+		if (buffer_length < 1){
+			fprintf(stderr,"Connection terminated prematurely.\n");
+			return -1;
+		}
 		printf("(Server)> %s\n",buffer);
 		if (buffer_length == strlen(KILL)+1 && strncmp(buffer, KILL, buffer_length) == 0){
 			if (verbose){
@@ -141,6 +235,17 @@ int client(){
 			sendall(server,CONFIRM,strlen(CONFIRM)+1);
 			active = 0;
 			break;
+		}else if (buffer_length == strlen(SENDING_FILE)+1 && strncmp(buffer, SENDING_FILE, buffer_length)){
+			if (verbose){
+				printf("File incoming...\n");
+			}
+			result = sendall(server,CONFIRM,strlen(CONFIRM)+1);
+			if (result < 0){
+				fprintf(stderr,"Could not send confirmation.\n");
+				return -1;
+			}
+			//receive and write the file
+			recv_file(server,"epic_file");
 		}
 
 		free(buffer);//allocated by recvall
