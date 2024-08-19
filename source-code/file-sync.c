@@ -7,7 +7,7 @@
 #include "tcp-toolkit.h"
 #include "args.h"
 
-#define USAGE "Usage:\n	-c : client mode\n	-s <config file>: server mode\n"
+#define USAGE "Usage:\n	-c : client mode\n	-s <config file>: server mode\n	-q : quiet mode (no output)"
 #define PORT "8173"
 #define BUFFER_MAX 1024
 #define KILL "stop running now"
@@ -26,6 +26,7 @@ int server(); //server holds and sends files to clients
 int client(); //receives files from the server
 
 int main(int argc, char **argv){
+	int mode = 0;//what the program does (server client or help)
 	verbose_tcp_toolkit = 0;//output from tcp toolkit funcitons
 	verbose = 1;
 	struct args args;
@@ -42,8 +43,18 @@ int main(int argc, char **argv){
 				return -1;
 			}
 			snprintf(config_filename,PATH_MAX,"%s",args.other[0]);
-			return server();
+			mode = 1;
 		case 'c':
+			mode = 2;
+		case 'q':
+			daemon(1,0);//redirect stdin out and err to /dev/null
+	}
+	switch (mode){
+		case 0:
+			printf(USAGE);//help text
+		case 1:
+			return server();
+		case 2:
 			return client();
 	}
 	free_args(&args);
@@ -158,6 +169,7 @@ int server(){
 					close(client);
 					return -1;
 				}
+				free(buffer);
 				//start file transmition
 				send_file(client,line_buffer);
 			}else{
