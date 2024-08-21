@@ -175,6 +175,8 @@ int server(){
 				free(buffer);
 				//start file transmition
 				send_file(client,line_buffer);
+				recvall(client,&buffer);//acknowlegment
+				free(buffer);
 			}else{
 				fprintf(stderr,"ERROR: config file: file [%s] not found.\n",line_buffer);
 			}
@@ -261,6 +263,11 @@ int client(){
 			}
 			//receive and write the file
 			recv_file(server,"epic_file");
+			printf("file received.\n");
+			if (sendall(server,CONFIRM,strlen(CONFIRM)+1) < 0){
+				fprintf(stderr,"Could not confirm file reception.\n");
+				return -1;
+			}
 		}else{
 			printf("Server response [%s](%d) did not match [%s](%d) or [%s](%d). Connection may be broken. Terminating\n",buffer,buffer_length,SENDING_FILE,strlen(SENDING_FILE)+1,KILL,strlen(KILL));
 		}
