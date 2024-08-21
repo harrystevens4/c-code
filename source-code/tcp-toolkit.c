@@ -309,7 +309,11 @@ int recv_file(int socket, const char * filename){
 			if (verbose_tcp_toolkit){
 				printf("[tcp-toolkit/recv_file]: Got char %c.\n",buffer[0]);
 			}
-			fprintf(fp,"%s",buffer);
+			if (fprintf(fp,"%c",*buffer) < 0){
+				fprintf(stderr,"ERROR [tcp-toolkit/recv_file]: Could not write to file");
+				return -1;
+			}
+			printf("%c",*buffer);
 			free(buffer);
 			//confirmation
 			if (sendall(socket,"OK",3) < 0){
