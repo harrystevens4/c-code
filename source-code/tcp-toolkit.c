@@ -196,7 +196,8 @@ size_t recvall(int socket,char **buffer){
 	return buffer_size;
 }
 int send_file(int socket, const char * filename){
-	char buffer[2] = {'\0','\0'};
+	int buffer_size;
+	char buffer[1024];
 	char *recv_buffer;
 	size_t recv_buffer_size;
 	FILE *fp;
@@ -218,7 +219,7 @@ int send_file(int socket, const char * filename){
 		return -1;
 	}
 	while (1){//mainloop for transmitting file
-		buffer[0] = fgetc(fp);
+		buffer_size = fread(buffer,1,1024,fp);
 		if (!feof(fp)){
 			if (verbose_tcp_toolkit){
 				printf("[tcp-toolkit/send_file]: Pulled char %c from file, informing client to continue receiving...\n",buffer[0]);
@@ -237,14 +238,14 @@ int send_file(int socket, const char * filename){
 			}
 			free(recv_buffer);
 			if (verbose_tcp_toolkit){
-				printf("[tcp-toolkit/send_file]: sending char %c now...\n");
+				printf("[tcp-toolkit/send_file]: sending buffer now...\n");
 			}
-			if (sendall(socket,buffer,1) < 0){//one char per transmition
+			if (sendall(socket,buffer,buffer_size) < 0){//one char per transmition
 				fprintf(stderr,"ERROR [tcp-toolkit/send_file]: Connection closed.\n");
 				return -1;
 			}
 			if (verbose_tcp_toolkit){
-				printf("[tcp-toolkit/send_file]: sent char. waiting for confirmation.\n");
+				printf("[tcp-toolkit/send_file]: sent. waiting for confirmation.\n");
 			}
 			recv_buffer_size = recvall(socket, &recv_buffer);
 			if (recv_buffer_size < 1){
@@ -307,13 +308,13 @@ int recv_file(int socket, const char * filename){
 				return -1;
 			}
 			if (verbose_tcp_toolkit){
-				printf("[tcp-toolkit/recv_file]: Got char %c.\n",buffer[0]);
+				printf("[tcp-toolkit/recv_file]: Got %.*s.\n",buffer_length,buffer);
 			}
-			if (fprintf(fp,"%c",*buffer) < 0){
+			if (fprintf(fp,"%.*s",buffer_length,buffer) < 0){
 				fprintf(stderr,"ERROR [tcp-toolkit/recv_file]: Could not write to file");
 				return -1;
 			}
-			printf("%c",*buffer);
+			printf("%.*s",buffer_length,buffer);
 			fflush(stdout);
 			free(buffer);
 			//confirmation
