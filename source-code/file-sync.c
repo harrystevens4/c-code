@@ -250,7 +250,7 @@ int client(){
 			sendall(server,CONFIRM,strlen(CONFIRM)+1);
 			active = 0;
 			break;
-		}else if (buffer_length == strlen(SENDING_FILE)+1 && strncmp(buffer, SENDING_FILE, buffer_length)){
+		}else if (buffer_length == strlen(SENDING_FILE)+1 && strncmp(buffer, SENDING_FILE, buffer_length) == 0){
 			if (verbose){
 				printf("File incoming...\n");
 			}
