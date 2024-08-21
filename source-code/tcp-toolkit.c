@@ -228,14 +228,30 @@ int send_file(int socket, const char * filename){
 				return -1;
 			}
 			recv_buffer_size = recvall(socket,&recv_buffer);//confirmation
+			if (verbose_tcp_toolkit){
+				printf("[tcp-toolkit/send_file]: Got confirmation of %s.\n",recv_buffer);
+			}
 			if (recv_buffer_size < 1){
 				fprintf(stderr,"[tcp-toolkit/send_file]: Connection closed.\n");
 				return -1;
 			}
 			free(recv_buffer);
+			if (verbose_tcp_toolkit){
+				printf("[tcp-toolkit/send_file]: sending char %c now...\n");
+			}
 			if (sendall(socket,buffer,1) < 0){//one char per transmition
 				fprintf(stderr,"ERROR [tcp-toolkit/send_file]: Connection closed.\n");
 				return -1;
+			}
+			if (verbose_tcp_toolkit){
+				printf("[tcp-toolkit/send_file]: sent char. waiting for confirmation.\n");
+			}
+			recv_buffer_size = recvall(socket, &recv_buffer);
+			if (recv_buffer_size < 1){
+				fprintf(stderr,"ERROR [tcp-toolkit/send_file]: Client disconnected.\n");
+			}
+			if (verbose_tcp_toolkit){
+				printf("[tcp-toolkit/send_file]: got confirmation %s.\n",recv_buffer);
 			}
 		}else{
 			if (verbose_tcp_toolkit){
@@ -290,8 +306,16 @@ int recv_file(int socket, const char * filename){
 				fprintf(stderr,"ERROR [tcp-toolkit/recv_file]: Connection closed");
 				return -1;
 			}
+			if (verbose_tcp_toolkit){
+				printf("[tcp-toolkit/recv_file]: Got char %c.\n",buffer[0]);
+			}
 			fprintf(fp,"%s",buffer);
 			free(buffer);
+			//confirmation
+			if (sendall(socket,"OK",3) < 0){
+				fprintf(stderr,"ERROR [tcp-toolkit/recv_file]: Connection closed.\n");
+				return -1;
+			}
 		}else{
 			free(buffer);
 			break;
