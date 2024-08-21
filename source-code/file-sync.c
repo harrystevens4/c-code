@@ -281,7 +281,7 @@ int client(){
 				fprintf(stderr,"Could not communicate with the server");
 			}
 			snprintf(filename, 1024, "~/Public/%s", buffer);
-			free(buffer);
+			//free(buffer);
 			result = sendall(server,"OK",3);
 			if (result < 0){
 				fprintf(stderr,"Could not send confirmation.\n");
