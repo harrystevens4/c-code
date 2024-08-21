@@ -220,7 +220,7 @@ int send_file(int socket, const char * filename){
 	}
 	while (1){//mainloop for transmitting file
 		buffer_size = fread(buffer,1,1024,fp);
-		if (!feof(fp)){
+		if (buffer_size > 0){
 			if (verbose_tcp_toolkit){
 				printf("[tcp-toolkit/send_file]: Pulled char %c from file, informing client to continue receiving...\n",buffer[0]);
 			}
