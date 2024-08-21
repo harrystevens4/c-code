@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <pwd.h>
+#include <sys/types.h>
 #include <libgen.h>
 #include <string.h>
 #include <stdlib.h>
@@ -280,7 +282,9 @@ int client(){
 			if (buffer_length < 1){
 				fprintf(stderr,"Could not communicate with the server");
 			}
-			snprintf(filename, 1024, "~/Public/%s", buffer);
+			const char *home_directory;
+			home_directory = getpwuid(getuid())->pw_dir;
+			snprintf(filename, 1024, "%s/Public/%s",home_directory , buffer);
 			//free(buffer);
 			result = sendall(server,"OK",3);
 			if (result < 0){
