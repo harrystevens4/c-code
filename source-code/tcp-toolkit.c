@@ -220,15 +220,38 @@ int send_file(int socket, const char * filename){
 	while (1){//mainloop for transmitting file
 		buffer[0] = fgetc(fp);
 		if (!feof(fp)){
-			sendall(socket,"+",2);// tell the receiver to accept more packets
+			if (verbose_tcp_toolkit){
+				printf("[tcp-toolkit/send_file]: Pulled char %c from file, informing client to continue receiving...\n",buffer[0]);
+			}
+			if (sendall(socket,"+",2) < 0){// tell the receiver to accept more packets
+				fprintf(stderr,"ERROR [tcp-toolkit/send_file]: Connection closed.\n");
+				return -1;
+			}
 			recv_buffer_size = recvall(socket,&recv_buffer);//confirmation
+			if (recv_buffer_size < 1){
+				fprintf(stderr,"[tcp-toolkit/send_file]: Connection closed.\n");
+				return -1;
+			}
 			free(recv_buffer);
-			sendall(socket,buffer,1);//one char per transmition
+			if (sendall(socket,buffer,1) < 0){//one char per transmition
+				fprintf(stderr,"ERROR [tcp-toolkit/send_file]: Connection closed.\n");
+				return -1;
+			}
 		}else{
-			sendall(socket,"done",5);// no more transmitions from us
+			if (verbose_tcp_toolkit){
+				printf("[tcp-toolkit/send_file]: End of file, informing client...\n");
+			}
+			if (sendall(socket,"done",5) < 0){// no more transmitions from us
+				fprintf(stderr,"ERROR [tcp-toolkit/send_file]: Connection closed.\n");
+				return -1;
+			}
 			break; 
 		}
 	}
+	if (verbose_tcp_toolkit){
+		printf("[tcp-toolkit/send_file]: File transmition successfull.\n");
+	}
+	return 0;
 
 }
 int recv_file(int socket, const char * filename){
@@ -258,7 +281,15 @@ int recv_file(int socket, const char * filename){
 		if (strncmp(buffer,"+",2) == 0 && buffer_length == 2){//server says more data
 			result = sendall(socket,"OK",3); //acknowledgement
 			free(buffer);
+			if (result < 0){
+				fprintf(stderr,"ERROR [tcp-toolkit/recv_file]: Could not send acknowlegement.\n");
+				return -1;
+			}
 			buffer_length = recvall(socket,&buffer);
+			if (buffer_length < 1){
+				fprintf(stderr,"ERROR [tcp-toolkit/recv_file]: Connection closed");
+				return -1;
+			}
 			fprintf(fp,"%s",buffer);
 			free(buffer);
 		}else{
@@ -267,5 +298,8 @@ int recv_file(int socket, const char * filename){
 		}
 	}
 	fclose(fp);//clean up
+	if (verbose_tcp_toolkit){
+		printf("[tcp-toolkit/recv_file]: File received successfuly.\n");
+	}
 	return 0;
 }
