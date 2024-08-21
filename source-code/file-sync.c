@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <libgen.h>
 #include <string.h>
 #include <stdlib.h>
 #include <unistd.h>
@@ -173,6 +174,19 @@ int server(){
 					return -1;
 				}
 				free(buffer);
+				//get filename
+				char * base_filename;
+				base_filename = basename(line_buffer);
+				printf("sending filename %s\n",base_filename);
+				if (sendall(client,base_filename,strlen(base_filename)+1) < 0){
+					fprintf(stderr,"Client disconnected\n");
+					return -1;
+				}
+				if (recvall(client,&buffer) < 1){
+					fprintf(stderr,"Client disconnected\n");
+					return -1;
+				}
+
 				//start file transmition
 				send_file(client,line_buffer);
 				recvall(client,&buffer);//acknowlegment
@@ -261,8 +275,20 @@ int client(){
 				fprintf(stderr,"Could not send confirmation.\n");
 				return -1;
 			}
+			char filename[1024];
+			buffer_length = recvall(server,&buffer);
+			if (buffer_length < 1){
+				fprintf(stderr,"Could not communicate with the server");
+			}
+			snprintf(filename, 1024, "~/Public/%s", buffer);
+			free(buffer);
+			result = sendall(server,"OK",3);
+			if (result < 0){
+				fprintf(stderr,"Could not send confirmation.\n");
+				return -1;
+			}
 			//receive and write the file
-			recv_file(server,"epic_file");
+			recv_file(server,filename);
 			printf("file received.\n");
 			if (sendall(server,CONFIRM,strlen(CONFIRM)+1) < 0){
 				fprintf(stderr,"Could not confirm file reception.\n");
