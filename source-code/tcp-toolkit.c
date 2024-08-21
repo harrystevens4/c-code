@@ -195,3 +195,77 @@ size_t recvall(int socket,char **buffer){
 	}
 	return buffer_size;
 }
+int send_file(int socket, const char * filename){
+	char buffer[2] = {'\0','\0'};
+	char *recv_buffer;
+	size_t recv_buffer_size;
+	FILE *fp;
+	//check file exists
+	if (verbose_tcp_toolkit){
+		printf("[tcp-toolkit/send_file]: Checking file access...\n");
+	}
+	if (access(filename,F_OK) < 0){
+		fprintf(stderr,"ERROR [tcp-toolkit/send_file]: File %s cannot be accessed.\n", filename);
+		perror("access");
+		return -1;
+	}
+	if (verbose_tcp_toolkit){
+		printf("[tcp-toolkit/send_file]: File access ok.\n");
+	}
+	fp = fopen(filename,"r");
+	if (fp == NULL){
+		fprintf(stderr,"ERROR [tcp-toolkit/send_file]: Could not open %s for reading.\n",filename);
+		return -1;
+	}
+	while (1){//mainloop for transmitting file
+		buffer[0] = fgetc(fp);
+		if (!feof(fp)){
+			sendall(socket,"+",2);// tell the receiver to accept more packets
+			recv_buffer_size = recvall(socket,&recv_buffer);//confirmation
+			free(recv_buffer);
+			sendall(socket,buffer,1);//one char per transmition
+		}else{
+			sendall(socket,"done",5);// no more transmitions from us
+			break; 
+		}
+	}
+
+}
+int recv_file(int socket, const char * filename){
+	size_t buffer_length;
+	char *buffer;
+	int result;
+	//open file for writing
+	if (verbose_tcp_toolkit){
+		printf("[tcp-toolkit/recv_file]: Opening %s for writing...\n",filename);
+	}
+	FILE *fp;
+	fp = fopen(filename,"w");
+	if (fp == NULL){
+		fprintf(stderr, "[tcp-toolkit/recv_file]: Could not open %s for writing.\n",filename);
+		perror("fopen");
+		return -1;
+	}
+	if (verbose_tcp_toolkit){
+		printf("[tcp-toolkit/recv_file]: Opened file.\n");
+	}
+	while (1){
+		buffer_length = recvall(socket,&buffer);
+		if (buffer_length < 1){
+			fprintf(stderr,"ERROR [tcp-toolkit/recv_file]: Socket not connected.\n");
+			return -1;
+		}
+		if (strncmp(buffer,"+",2) == 0 && buffer_length == 2){//server says more data
+			result = sendall(socket,"OK",3); //acknowledgement
+			free(buffer);
+			buffer_length = recvall(socket,&buffer);
+			fprintf(fp,"%s",buffer);
+			free(buffer);
+		}else{
+			free(buffer);
+			break;
+		}
+	}
+	fclose(fp);//clean up
+	return 0;
+}

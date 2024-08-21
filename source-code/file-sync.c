@@ -44,10 +44,13 @@ int main(int argc, char **argv){
 			}
 			snprintf(config_filename,PATH_MAX,"%s",args.other[0]);
 			mode = 1;
+			break;
 		case 'c':
 			mode = 2;
+			break;
 		case 'q':
 			daemon(1,0);//redirect stdin out and err to /dev/null
+			break;
 	}
 	switch (mode){
 		case 0:
