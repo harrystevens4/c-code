@@ -2,7 +2,7 @@
 #include <stdlib.h>
 #include <stdio.h>
 
-#define SHUTDOWN_COMMAND "/usr/bin/shutdown"
+#define SHUTDOWN_COMMAND "/usr/bin/shutdown now"
 #define RESTART_COMMAND "/usr/bin/reboot"
 
 void shutdown(GtkWindow *window);
