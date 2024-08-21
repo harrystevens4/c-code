@@ -232,7 +232,7 @@ int client(){
 		return -1;
 	}
 
-	printf("(Server)> "READY"\n");
+	printf("(Client)> "READY"\n");
 	sendall(server,READY,strlen(READY)+1);
 
 	while (active){
@@ -261,6 +261,8 @@ int client(){
 			}
 			//receive and write the file
 			recv_file(server,"epic_file");
+		}else{
+			printf("Server response %s did not match %s or %s. Connection may be broken. Terminating\n",buffer,SENDING_FILE,KILL);
 		}
 
 		free(buffer);//allocated by recvall
