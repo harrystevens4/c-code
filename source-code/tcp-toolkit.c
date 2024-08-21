@@ -314,6 +314,7 @@ int recv_file(int socket, const char * filename){
 				return -1;
 			}
 			printf("%c",*buffer);
+			fflush(stdout);
 			free(buffer);
 			//confirmation
 			if (sendall(socket,"OK",3) < 0){
