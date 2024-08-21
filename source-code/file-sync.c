@@ -262,7 +262,7 @@ int client(){
 			//receive and write the file
 			recv_file(server,"epic_file");
 		}else{
-			printf("Server response %s did not match %s or %s. Connection may be broken. Terminating\n",buffer,SENDING_FILE,KILL);
+			printf("Server response [%s](%d) did not match [%s](%d) or [%s](%d). Connection may be broken. Terminating\n",buffer,buffer_length,SENDING_FILE,strlen(SENDING_FILE)+1,KILL,strlen(KILL));
 		}
 
 		free(buffer);//allocated by recvall
