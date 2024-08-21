@@ -27,7 +27,7 @@ int client(); //receives files from the server
 
 int main(int argc, char **argv){
 	int mode = 0;//what the program does (server client or help)
-	verbose_tcp_toolkit = 0;//output from tcp toolkit funcitons
+	verbose_tcp_toolkit = 1;//output from tcp toolkit funcitons
 	verbose = 1;
 	struct args args;
 	parse_args(argc,argv,&args);
