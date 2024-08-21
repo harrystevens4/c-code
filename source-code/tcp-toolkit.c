@@ -254,7 +254,7 @@ int send_file(int socket, const char * filename){
 			if (verbose_tcp_toolkit){
 				printf("[tcp-toolkit/send_file]: got confirmation %s.\n",recv_buffer);
 			}
-		}else{
+		}else{ //------------------------ dealing with the end of file -----
 			if (verbose_tcp_toolkit){
 				printf("[tcp-toolkit/send_file]: End of file, informing client...\n");
 			}
@@ -314,8 +314,8 @@ int recv_file(int socket, const char * filename){
 				fprintf(stderr,"ERROR [tcp-toolkit/recv_file]: Could not write to file");
 				return -1;
 			}
-			printf("%.*s",buffer_length,buffer);
-			fflush(stdout);
+			//printf("%.*s",buffer_length,buffer);
+			//fflush(stdout);
 			free(buffer);
 			//confirmation
 			if (sendall(socket,"OK",3) < 0){
