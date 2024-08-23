@@ -227,7 +227,7 @@ size_t recvall(int socket,char **buffer){
 			printf("[tcp-toolkit/recvall]: Receiving packet...\n");
 		}
 		bytes_received = recv(socket,(*buffer)+total_bytes_received,packet_size,0);
-		if (bytes_received < 0){
+		if (bytes_received < 1){
 			fprintf(error_file,"ERROR [tcp-toolkit/recvall]: Connection closed before transmition completed.\n");
 			return 0;
 		}
