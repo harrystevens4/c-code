@@ -6,9 +6,10 @@
 #include "tcp-toolkit.h"
 #include <sys/socket.h>
 
-#define HELP "Usage:\n	network-pipe [client] [port]: connect to client\n	network-pipe : start in server mode\n -w : wait for server rather then throwing error if connection is not available\n"
+#define HELP "Usage:\n	network-pipe [client] [port]: connect to client\n	network-pipe : start in server mode\n	-w : wait for server rather then throwing error if connection is not available\n	-q : no output at all\n"
 
 int wait = 0;//wether we should wait for the server to come online or just exit if we cant connect
+int silent = 0;//NO output whatsoever even stderr
 
 int client(char * host, char * port);
 int server(char * port);
@@ -23,6 +24,7 @@ int main(int argc, char **argv){
 	//detect args
 	for (int i = 0; i < args.number_single; i++){
 		if (args.single[i] == 'w') wait = 1;
+		if (args.single[i] == 'q') silent = 1;
 	}
 
 	//server code
@@ -50,7 +52,7 @@ int client(char * host, char * port){
 	do{
 		server = connect_server_socket(host,port);
 		if (server < 0 && wait != 1){
-			fprintf(stderr,"Could not connect to server.\n");
+			if (!silent) fprintf(stderr,"Could not connect to server.\n");
 			return 1;
 		}
 		if (server > 0){
