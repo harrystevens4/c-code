@@ -9,8 +9,15 @@
 #include <sys/socket.h>
 
 int verbose_tcp_toolkit;
+int silent_errors = 0;
+static FILE *error_file;
 
 int make_socket(const char * host ,const char * port, struct addrinfo **res){
+	if (silent_errors){
+		error_file = fopen("/dev/null","w");
+	}else{
+		error_file = stderr;
+	}
 	int socketfd;
 
 	//set up info for socket
@@ -29,7 +36,7 @@ int make_socket(const char * host ,const char * port, struct addrinfo **res){
 
 	int result = getaddrinfo(host, port, &hints, res); //fill in addrinfo struct 'res'
 	if (result != 0){
-		fprintf(stderr,"ERROR [tcp-toolkit/make_socket]: getaddrinfo: %s",gai_strerror(result));
+		fprintf(error_file,"ERROR [tcp-toolkit/make_socket]: getaddrinfo: %s",gai_strerror(result));
 		return -1;
 	}
 
@@ -43,7 +50,7 @@ int make_socket(const char * host ,const char * port, struct addrinfo **res){
 	}
 	socketfd = socket((*res)->ai_family, (*res)->ai_socktype, (*res)->ai_protocol);
 	if (socketfd < 0){
-		fprintf(stderr,"ERROR [tcp-toolkit/make_socket]: could not create socket\n");
+		fprintf(error_file,"ERROR [tcp-toolkit/make_socket]: could not create socket\n");
 		perror("socket");
 		return -1;
 	}
@@ -54,7 +61,7 @@ int make_socket(const char * host ,const char * port, struct addrinfo **res){
 	//make it reusable instantly
 	int option_value = 1;
 	if(setsockopt(socketfd,SOL_SOCKET,SO_REUSEADDR, &option_value, sizeof(option_value)) != 0){
-		fprintf(stderr,"ERROR [tcp-toolkit/make_socket]: Could not set socket options.\n");
+		fprintf(error_file,"ERROR [tcp-toolkit/make_socket]: Could not set socket options.\n");
 		perror("setsockopt");
 		return -1;
 	}
@@ -63,10 +70,15 @@ int make_socket(const char * host ,const char * port, struct addrinfo **res){
 	return socketfd;
 }
 int make_server_socket(const char * port, int backlog){
+	if (silent_errors){
+		error_file = fopen("/dev/null","w");
+	}else{
+		error_file = stderr;
+	}
 	struct addrinfo *res;
 	int socket = make_socket(NULL, port, &res);
 	if (socket < 0){
-		fprintf(stderr, "ERROR: could not make the socket\n");
+		fprintf(error_file, "ERROR: could not make the socket\n");
 		return -1;
 	}
 
@@ -75,7 +87,7 @@ int make_server_socket(const char * port, int backlog){
 		printf("[tcp-toolkit/make_server_socket]: Binding socket...\n");
 	}
 	if (bind(socket, (struct sockaddr *)res->ai_addr, res->ai_addrlen) < 0){
-		fprintf(stderr,"ERROR [tpc-toolkit/make_server_socket]: could not bind socket\n");
+		fprintf(error_file,"ERROR [tpc-toolkit/make_server_socket]: could not bind socket\n");
 		perror("bind");
 		return -1;
 	}
@@ -86,7 +98,7 @@ int make_server_socket(const char * port, int backlog){
 		printf("[tcp-toolkit/make_server_socket]: Starting listener.\n");
 	}
 	if (listen(socket,backlog) < 0){
-		fprintf(stderr,"ERROR [tcp-toolkit/make_server_socket]: Could not listen.\n");
+		fprintf(error_file,"ERROR [tcp-toolkit/make_server_socket]: Could not listen.\n");
 		perror("listen");
 		return -1;
 	}
@@ -99,20 +111,25 @@ int make_server_socket(const char * port, int backlog){
 	return socket;
 }
 int connect_server_socket(char * host, char * port){
+	if (silent_errors){
+		error_file = fopen("/dev/null","w");
+	}else{
+		error_file = stderr;
+	}
 	char server_ip_address[1024];
 	void *addr;
 	struct addrinfo *p;
 	struct addrinfo *res;
 	int socket = make_socket(host, port, &res);
 	if (socket < 0){
-		fprintf(stderr, "ERROR [tcp-toolkit/connect_server_socket]: could not make the socket\n");
+		fprintf(error_file, "ERROR [tcp-toolkit/connect_server_socket]: could not make the socket\n");
 		return -1;
 	}
 	if (verbose_tcp_toolkit){
 		printf("[tcp-toolkit/connect_server_socket]: Attempting to connect...\n");
 	}
 	if (connect(socket,res->ai_addr, res->ai_addrlen) < 0){//something is going wrong
-		fprintf(stderr,"ERROR [tcp-toolkit/connect_server_socket]: Could not connect.\n");
+		fprintf(error_file,"ERROR [tcp-toolkit/connect_server_socket]: Could not connect.\n");
 		perror("connect");
 		return -1;
 	}
@@ -132,6 +149,11 @@ int connect_server_socket(char * host, char * port){
 	return socket;
 }
 int sendall(int socket, char * buffer, size_t buffer_length){
+	if (silent_errors){
+		error_file = fopen("/dev/null","w");
+	}else{
+		error_file = stderr;
+	}
 	int bytes_sent = 0;
 	int total_bytes_sent = 0;
 	int bytes_received = 0;
@@ -142,7 +164,7 @@ int sendall(int socket, char * buffer, size_t buffer_length){
 		printf("[tcp-toolkit/sendall]: Sending buffer size...\n");
 	}
 	if (send(socket, &buffer_length, sizeof(size_t), 0) < 0){//tell receiver how many bytes to expect
-		fprintf(stderr,"ERROR [tcp-toolkit/sendall]: Could not send data size.\n");
+		fprintf(error_file,"ERROR [tcp-toolkit/sendall]: Could not send data size.\n");
 		perror("send");
 		return -1;
 	}
@@ -156,7 +178,7 @@ int sendall(int socket, char * buffer, size_t buffer_length){
 			printf("[tcp-toolkit/sendall]: sent %d/%d bytes\n",bytes_sent,buffer_length);
 		}
 		if (bytes_sent < 0){
-			fprintf(stderr,"ERROR [tcp-toolkit/sendall]: Could not send data.\n");
+			fprintf(error_file,"ERROR [tcp-toolkit/sendall]: Could not send data.\n");
 			perror("send");
 			return -1;
 		}
@@ -169,7 +191,7 @@ int sendall(int socket, char * buffer, size_t buffer_length){
 	}
 	bytes_received = recv(socket,recv_buffer,1024,0);
 	if (bytes_received < 1){
-		fprintf(stderr,"ERROR [tcp-toolkit/sendall]: Connection closed before acknowlegdement received.\n");
+		fprintf(error_file,"ERROR [tcp-toolkit/sendall]: Connection closed before acknowlegdement received.\n");
 		perror("recv");
 		return -1;
 	}
@@ -177,6 +199,11 @@ int sendall(int socket, char * buffer, size_t buffer_length){
 	return 0;
 }
 size_t recvall(int socket,char **buffer){
+	if (silent_errors){
+		error_file = fopen("/dev/null","w");
+	}else{
+		error_file = stderr;
+	}
 	unsigned short packet_size = 1024;
 	size_t buffer_size;
 	char * data_buffer;
@@ -187,7 +214,7 @@ size_t recvall(int socket,char **buffer){
 		printf("[tcp-toolkit/recvall]: Receiving buffer size...\n");
 	}
 	if (recv(socket,&buffer_size,sizeof(size_t),0) < 0){
-		fprintf(stderr,"ERROR [tcp-toolkit/recvall]: Could not receive buffer size.\n");
+		fprintf(error_file,"ERROR [tcp-toolkit/recvall]: Could not receive buffer size.\n");
 		perror("recv");
 		return 0;//returning a size_t which is unsigned
 	}
@@ -201,7 +228,7 @@ size_t recvall(int socket,char **buffer){
 		}
 		bytes_received = recv(socket,(*buffer)+total_bytes_received,packet_size,0);
 		if (bytes_received < 0){
-			fprintf(stderr,"ERROR [tcp-toolkit/recvall]: Connection closed before transmition completed.\n");
+			fprintf(error_file,"ERROR [tcp-toolkit/recvall]: Connection closed before transmition completed.\n");
 			return 0;
 		}
 		if (verbose_tcp_toolkit){
@@ -214,7 +241,7 @@ size_t recvall(int socket,char **buffer){
 	}
 	result = send(socket,"OK",3,0);
 	if (result < 0){
-		fprintf(stderr,"ERROR [tcp-toolkit/recvall]: Could not send confirmation.\n");
+		fprintf(error_file,"ERROR [tcp-toolkit/recvall]: Could not send confirmation.\n");
 		perror("send");
 		return 0;
 	}
@@ -224,6 +251,11 @@ size_t recvall(int socket,char **buffer){
 	return buffer_size;
 }
 int send_file(int socket, const char * filename){
+	if (silent_errors){
+		error_file = fopen("/dev/null","w");
+	}else{
+		error_file = stderr;
+	}
 	int buffer_size;
 	char buffer[1024];
 	char *recv_buffer;
@@ -234,7 +266,7 @@ int send_file(int socket, const char * filename){
 		printf("[tcp-toolkit/send_file]: Checking file access...\n");
 	}
 	if (access(filename,F_OK) < 0){
-		fprintf(stderr,"ERROR [tcp-toolkit/send_file]: File %s cannot be accessed.\n", filename);
+		fprintf(error_file,"ERROR [tcp-toolkit/send_file]: File %s cannot be accessed.\n", filename);
 		perror("access");
 		return -1;
 	}
@@ -243,7 +275,7 @@ int send_file(int socket, const char * filename){
 	}
 	fp = fopen(filename,"r");
 	if (fp == NULL){
-		fprintf(stderr,"ERROR [tcp-toolkit/send_file]: Could not open %s for reading.\n",filename);
+		fprintf(error_file,"ERROR [tcp-toolkit/send_file]: Could not open %s for reading.\n",filename);
 		return -1;
 	}
 	while (1){//mainloop for transmitting file
@@ -253,7 +285,7 @@ int send_file(int socket, const char * filename){
 				printf("[tcp-toolkit/send_file]: Pulled char %c from file, informing client to continue receiving...\n",buffer[0]);
 			}
 			if (sendall(socket,"+",2) < 0){// tell the receiver to accept more packets
-				fprintf(stderr,"ERROR [tcp-toolkit/send_file]: Connection closed.\n");
+				fprintf(error_file,"ERROR [tcp-toolkit/send_file]: Connection closed.\n");
 				return -1;
 			}
 			recv_buffer_size = recvall(socket,&recv_buffer);//confirmation
@@ -261,7 +293,7 @@ int send_file(int socket, const char * filename){
 				printf("[tcp-toolkit/send_file]: Got confirmation of %s.\n",recv_buffer);
 			}
 			if (recv_buffer_size < 1){
-				fprintf(stderr,"[tcp-toolkit/send_file]: Connection closed.\n");
+				fprintf(error_file,"[tcp-toolkit/send_file]: Connection closed.\n");
 				return -1;
 			}
 			free(recv_buffer);
@@ -269,7 +301,7 @@ int send_file(int socket, const char * filename){
 				printf("[tcp-toolkit/send_file]: sending buffer now...\n");
 			}
 			if (sendall(socket,buffer,buffer_size) < 0){//one char per transmition
-				fprintf(stderr,"ERROR [tcp-toolkit/send_file]: Connection closed.\n");
+				fprintf(error_file,"ERROR [tcp-toolkit/send_file]: Connection closed.\n");
 				return -1;
 			}
 			if (verbose_tcp_toolkit){
@@ -277,7 +309,7 @@ int send_file(int socket, const char * filename){
 			}
 			recv_buffer_size = recvall(socket, &recv_buffer);
 			if (recv_buffer_size < 1){
-				fprintf(stderr,"ERROR [tcp-toolkit/send_file]: Client disconnected.\n");
+				fprintf(error_file,"ERROR [tcp-toolkit/send_file]: Client disconnected.\n");
 			}
 			if (verbose_tcp_toolkit){
 				printf("[tcp-toolkit/send_file]: got confirmation %s.\n",recv_buffer);
@@ -287,7 +319,7 @@ int send_file(int socket, const char * filename){
 				printf("[tcp-toolkit/send_file]: End of file, informing client...\n");
 			}
 			if (sendall(socket,"done",5) < 0){// no more transmitions from us
-				fprintf(stderr,"ERROR [tcp-toolkit/send_file]: Connection closed.\n");
+				fprintf(error_file,"ERROR [tcp-toolkit/send_file]: Connection closed.\n");
 				return -1;
 			}
 			break; 
@@ -300,6 +332,11 @@ int send_file(int socket, const char * filename){
 
 }
 int recv_file(int socket, const char * filename){
+	if (silent_errors){
+		error_file = fopen("/dev/null","w");
+	}else{
+		error_file = stderr;
+	}
 	size_t buffer_length;
 	char *buffer;
 	int result;
@@ -310,7 +347,7 @@ int recv_file(int socket, const char * filename){
 	FILE *fp;
 	fp = fopen(filename,"w");
 	if (fp == NULL){
-		fprintf(stderr, "[tcp-toolkit/recv_file]: Could not open %s for writing.\n",filename);
+		fprintf(error_file, "[tcp-toolkit/recv_file]: Could not open %s for writing.\n",filename);
 		perror("fopen");
 		return -1;
 	}
@@ -320,26 +357,26 @@ int recv_file(int socket, const char * filename){
 	while (1){
 		buffer_length = recvall(socket,&buffer);
 		if (buffer_length < 1){
-			fprintf(stderr,"ERROR [tcp-toolkit/recv_file]: Socket not connected.\n");
+			fprintf(error_file,"ERROR [tcp-toolkit/recv_file]: Socket not connected.\n");
 			return -1;
 		}
 		if (strncmp(buffer,"+",2) == 0 && buffer_length == 2){//server says more data
 			result = sendall(socket,"OK",3); //acknowledgement
 			free(buffer);
 			if (result < 0){
-				fprintf(stderr,"ERROR [tcp-toolkit/recv_file]: Could not send acknowlegement.\n");
+				fprintf(error_file,"ERROR [tcp-toolkit/recv_file]: Could not send acknowlegement.\n");
 				return -1;
 			}
 			buffer_length = recvall(socket,&buffer);
 			if (buffer_length < 1){
-				fprintf(stderr,"ERROR [tcp-toolkit/recv_file]: Connection closed");
+				fprintf(error_file,"ERROR [tcp-toolkit/recv_file]: Connection closed");
 				return -1;
 			}
 			if (verbose_tcp_toolkit){
 				printf("[tcp-toolkit/recv_file]: Got %.*s.\n",buffer_length,buffer);
 			}
 			if (fprintf(fp,"%.*s",buffer_length,buffer) < 0){
-				fprintf(stderr,"ERROR [tcp-toolkit/recv_file]: Could not write to file");
+				fprintf(error_file,"ERROR [tcp-toolkit/recv_file]: Could not write to file");
 				return -1;
 			}
 			//printf("%.*s",buffer_length,buffer);
@@ -347,7 +384,7 @@ int recv_file(int socket, const char * filename){
 			free(buffer);
 			//confirmation
 			if (sendall(socket,"OK",3) < 0){
-				fprintf(stderr,"ERROR [tcp-toolkit/recv_file]: Connection closed.\n");
+				fprintf(error_file,"ERROR [tcp-toolkit/recv_file]: Connection closed.\n");
 				return -1;
 			}
 		}else{

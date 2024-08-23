@@ -9,5 +9,6 @@ int send_file(int socket, const char * filename);
 int recv_file(int socket, const char * filename);
 
 extern int verbose_tcp_toolkit; //debugging info from tcp-toolkit functions
+extern int silent_errors;
 
 #endif
