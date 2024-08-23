@@ -51,6 +51,14 @@ int make_socket(const char * host ,const char * port, struct addrinfo **res){
 		printf("[tcp-toolkit/make_socket]: Socket created with fd %d.\n",socketfd);
 	}
 
+	//make it reusable instantly
+	int option_value = 1;
+	if(setsockopt(socketfd,SOL_SOCKET,SO_REUSEADDR, &option_value, sizeof(option_value)) != 0){
+		fprintf(stderr,"ERROR [tcp-toolkit/make_socket]: Could not set socket options.\n");
+		perror("setsockopt");
+		return -1;
+	}
+
 	//return the socket file descriptor
 	return socketfd;
 }
@@ -126,6 +134,9 @@ int connect_server_socket(char * host, char * port){
 int sendall(int socket, char * buffer, size_t buffer_length){
 	int bytes_sent = 0;
 	int total_bytes_sent = 0;
+	int bytes_received = 0;
+	int recv_buffer_size = 1024;
+	char recv_buffer[recv_buffer_size];
 
 	if (verbose_tcp_toolkit){
 		printf("[tcp-toolkit/sendall]: Sending buffer size...\n");
@@ -154,8 +165,15 @@ int sendall(int socket, char * buffer, size_t buffer_length){
 		buffer_length -= bytes_sent;
 	}while (total_bytes_sent < buffer_length);
 	if (verbose_tcp_toolkit){
-		printf("[tcp-toolkit/sendall]: Finnished sending data.\n");
+		printf("[tcp-toolkit/sendall]: Finnished sending data, waiting on acknowledgement...\n");
 	}
+	bytes_received = recv(socket,recv_buffer,1024,0);
+	if (bytes_received < 1){
+		fprintf(stderr,"ERROR [tcp-toolkit/sendall]: Connection closed before acknowlegdement received.\n");
+		perror("recv");
+		return -1;
+	}
+	
 	return 0;
 }
 size_t recvall(int socket,char **buffer){
@@ -164,6 +182,7 @@ size_t recvall(int socket,char **buffer){
 	char * data_buffer;
 	int bytes_received = 0;
 	int total_bytes_received = 0;
+	int result;
 	if (verbose_tcp_toolkit){
 		printf("[tcp-toolkit/recvall]: Receiving buffer size...\n");
 	}
@@ -181,7 +200,7 @@ size_t recvall(int socket,char **buffer){
 			printf("[tcp-toolkit/recvall]: Receiving packet...\n");
 		}
 		bytes_received = recv(socket,(*buffer)+total_bytes_received,packet_size,0);
-		if (bytes_received == 0){
+		if (bytes_received < 0){
 			fprintf(stderr,"ERROR [tcp-toolkit/recvall]: Connection closed before transmition completed.\n");
 			return 0;
 		}
@@ -191,7 +210,16 @@ size_t recvall(int socket,char **buffer){
 		total_bytes_received += bytes_received;
 	}while (total_bytes_received < buffer_size);
 	if (verbose_tcp_toolkit){
-		printf("[tcp-toolkit/recvall]: Finnished receiving data.\n");
+		printf("[tcp-toolkit/recvall]: Finnished receiving data, sending confirmation...\n");
+	}
+	result = send(socket,"OK",3,0);
+	if (result < 0){
+		fprintf(stderr,"ERROR [tcp-toolkit/recvall]: Could not send confirmation.\n");
+		perror("send");
+		return 0;
+	}
+	if (verbose_tcp_toolkit){
+		printf("[tcp-toolkit/recvall]: Confirmation sent.\n");
 	}
 	return buffer_size;
 }
