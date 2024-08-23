@@ -6,3 +6,5 @@ args.o : ../../source-code/args.h ../../source-code/args.c
 	gcc -c ../../source-code/args.c
 tcp-toolkit.o : ../../source-code/tcp-toolkit.c ../../source-code/tcp-toolkit.h
 	gcc -c ../../source-code/tcp-toolkit.c
+install : network-pipe
+	@./install
