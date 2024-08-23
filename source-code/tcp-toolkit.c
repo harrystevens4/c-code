@@ -130,7 +130,7 @@ int connect_server_socket(char * host, char * port){
 	}
 	if (connect(socket,res->ai_addr, res->ai_addrlen) < 0){//something is going wrong
 		fprintf(error_file,"ERROR [tcp-toolkit/connect_server_socket]: Could not connect.\n");
-		perror("connect");
+		if (!silent_errors) perror("connect");
 		return -1;
 	}
 	for (p = res; p != NULL; p = p->ai_next){
