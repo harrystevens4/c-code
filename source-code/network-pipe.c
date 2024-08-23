@@ -21,7 +21,7 @@ int main(int argc, char **argv){
 	parse_args(argc,argv,&args);
 
 	//detect args
-	for (int i; i < args.number_single; i++){
+	for (int i = 0; i < args.number_single; i++){
 		if (args.single[i] == 'w') wait = 1;
 	}
 
