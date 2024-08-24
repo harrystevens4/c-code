@@ -522,6 +522,7 @@ char * find_broadcasters(char * port){
 		if (!silent_errors) perror("recvfrom");
 		goto cleanup;
 	}
+	printf("%.*s",bytes_received,recv_buffer);
 	
 	cleanup:
 	close(socketfd);
