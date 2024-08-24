@@ -488,7 +488,7 @@ int broadcast_existence(char * port){
 #define FB "[tcp-toolkit/find_broadcasters]: "
 char * find_broadcasters(char * port){
 	char return_val_buffer[1024];
-	char *return_val = return_val_buffer;
+	char *return_val = NULL;
 	if (verbose_tcp_toolkit) printf(FB"creating socket...\n");
 	
 	struct addrinfo hints;
@@ -543,6 +543,7 @@ char * find_broadcasters(char * port){
 		if (!silent_errors) perror("recvfrom");
 		goto cleanup;
 	}
+	return_val = return_val_buffer;
 	snprintf(return_val,1024,"%s",recv_buffer);
 	if (verbose_tcp_toolkit) printf(FB "Got data of size %d\n",bytes_received);
 	
