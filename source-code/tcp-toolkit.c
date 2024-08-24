@@ -478,6 +478,7 @@ int broadcast_existence(char * port){
 		return_val = -1;
 		goto cleanup;
 	}
+	if (verbose_tcp_toolkit) printf(BE "broadcast complete, sending %.*s at %d bytes.\n",bytes_sent,ip_string,bytes_sent);
 	
 	cleanup:
 	close(socketfd);
@@ -486,7 +487,8 @@ int broadcast_existence(char * port){
 }
 #define FB "[tcp-toolkit/find_broadcasters]: "
 char * find_broadcasters(char * port){
-	char * return_val = NULL;
+	char return_val_buffer[1024];
+	char *return_val = return_val_buffer;
 	if (verbose_tcp_toolkit) printf(FB"creating socket...\n");
 	
 	struct addrinfo hints;
@@ -542,6 +544,7 @@ char * find_broadcasters(char * port){
 		goto cleanup;
 	}
 	snprintf(return_val,1024,"%s",recv_buffer);
+	if (verbose_tcp_toolkit) printf(FB "Got data of size %d\n",bytes_received);
 	
 	cleanup:
 	close(socketfd);
