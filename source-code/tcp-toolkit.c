@@ -406,7 +406,7 @@ int broadcast_existence(char * port){
 	
 	struct addrinfo hints;
 	memset(&hints,0,sizeof(hints));
-	struct addrinfo *info;
+	struct addrinfo *info, *ip_address;
 	hints.ai_flags = AI_PASSIVE;
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
@@ -417,6 +417,25 @@ int broadcast_existence(char * port){
 		if (!silent_errors) fprintf(stderr,ER BE "Could not get address info. %s\n",gai_strerror(result));
 		return -1;
 	}
+
+	if (verbose_tcp_toolkit) printf(BE "Getting current ip address\n");
+	char hostname[1024];
+	if (gethostname(hostname,1024) < 0){
+		if (!silent_errors) fprintf(stderr, ER BE "Could not get hostname.\n");
+		if (!silent_errors) perror("gethostname");
+		return -1;
+	}
+	result = getaddrinfo(hostname,port,&hints,&ip_address);
+	if (result != 0){
+		if (!silent_errors) fprintf(stderr,ER BE "Could not get address info. %s\n",gai_strerror(result));
+		return -1;
+	}
+	char ip_string[1024];
+	void * address;
+	struct sockaddr_in *ipv4 = (struct sockaddr_in *)ip_address->ai_addr;
+	address = &(ipv4->sin_addr);
+	inet_ntop(info->ai_family,address,ip_string,sizeof(ip_string));
+	if (verbose_tcp_toolkit) printf("broadcasting using message: %s\n",ip_string);
 
 	int socketfd = socket(info->ai_family,info->ai_socktype,info->ai_protocol);
 	if (socket < 0){
@@ -452,7 +471,7 @@ int broadcast_existence(char * port){
 
 	if (verbose_tcp_toolkit) printf(BE"starting broadcast.\n");
 	int bytes_sent;
-	bytes_sent = sendto(socketfd, "brug", 5, 0,info->ai_addr,info->ai_addrlen);
+	bytes_sent = sendto(socketfd, ip_string, strlen(ip_string)+1, 0,info->ai_addr,info->ai_addrlen);
 	if (bytes_sent < 0){
 		if (!silent_errors) fprintf(stderr,ER BE "Could not send data.\n");
 		if (!silent_errors) perror("sendto");
@@ -522,7 +541,7 @@ char * find_broadcasters(char * port){
 		if (!silent_errors) perror("recvfrom");
 		goto cleanup;
 	}
-	printf("Got %d bytes, %.*s\n",bytes_received,bytes_received,recv_buffer);
+	snprintf(return_val,1024,"%s",recv_buffer);
 	
 	cleanup:
 	close(socketfd);
