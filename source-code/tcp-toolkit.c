@@ -398,3 +398,133 @@ int recv_file(int socket, const char * filename){
 	}
 	return 0;
 }
+#define ER "ERROR "
+#define BE "[tcp-toolkit/broadcast_existence]: "
+int broadcast_existence(char * port){
+	int return_val = 0;
+	if (verbose_tcp_toolkit) printf(BE"creating socket...\n");
+	
+	struct addrinfo hints;
+	memset(&hints,0,sizeof(hints));
+	struct addrinfo *info;
+	hints.ai_flags = AI_PASSIVE;
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_DGRAM;
+
+	int result;
+	result = getaddrinfo("255.255.255.255",port,&hints,&info);
+	if (result != 0){
+		if (!silent_errors) fprintf(stderr,ER BE "Could not get address info. %s\n",gai_strerror(result));
+		return -1;
+	}
+
+	int socketfd = socket(info->ai_family,info->ai_socktype,info->ai_protocol);
+	if (socket < 0){
+		if (!silent_errors) fprintf(stderr,ER BE "Could not create socket.\n");
+		if (!silent_errors) perror("socket");
+		return_val -1;
+		goto cleanup;
+	}
+
+	if (verbose_tcp_toolkit) printf(BE "Binding socket...\n");
+	result = bind(socketfd, info->ai_addr, info->ai_addrlen);
+	if (result < 0){
+		if (!silent_errors) fprintf(stderr,ER BE "Could not bind socket.\n");
+		if (!silent_errors) perror("bind");
+		return_val -1;
+		goto cleanup;
+	}
+
+	if (verbose_tcp_toolkit) printf(BE"setting socket options...\n");
+	int option_value = 1;
+	if(setsockopt(socketfd,SOL_SOCKET,SO_REUSEADDR, &option_value, sizeof(option_value)) != 0){
+		if (!silent_errors) fprintf(stderr,ER BE"Could not set socket reuse.\n");
+		if (!silent_errors) perror("setsockopt");
+		return_val = -1;
+		goto cleanup;
+	}
+	if(setsockopt(socketfd,SOL_SOCKET,SO_BROADCAST, &option_value, sizeof(option_value)) != 0){
+		if (!silent_errors) fprintf(stderr,ER BE"Could not set socket broadcast.\n");
+		if (!silent_errors) perror("setsockopt");
+		return_val = -1;
+		goto cleanup;
+	}
+
+	if (verbose_tcp_toolkit) printf(BE"starting broadcast.\n");
+	int bytes_sent;
+	bytes_sent = sendto(socketfd, "brug", 5, 0,info->ai_addr,info->ai_addrlen);
+	if (bytes_sent < 0){
+		if (!silent_errors) fprintf(stderr,ER BE "Could not send data.\n");
+		if (!silent_errors) perror("sendto");
+		return_val = -1;
+		goto cleanup;
+	}
+	
+	cleanup:
+	close(socketfd);
+	freeaddrinfo(info);
+	return return_val;
+}
+#define FB "[tcp-toolkit/find_broadcasters]: "
+char * find_broadcasters(char * port){
+	char * return_val = NULL;
+	if (verbose_tcp_toolkit) printf(FB"creating socket...\n");
+	
+	struct addrinfo hints;
+	memset(&hints,0,sizeof(hints));
+	struct addrinfo *info;
+	hints.ai_flags = AI_PASSIVE;
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_DGRAM;
+
+	int result;
+	result = getaddrinfo(NULL,port,&hints,&info);
+	if (result != 0){
+		if (!silent_errors) fprintf(stderr,ER FB "Could not get address info. %s\n",gai_strerror(result));
+		return return_val;
+	}
+
+	int socketfd = socket(info->ai_family,info->ai_socktype,info->ai_protocol);
+	if (socket < 0){
+		if (!silent_errors) fprintf(stderr,ER FB "Could not create socket.\n");
+		if (!silent_errors) perror("socket");
+		goto cleanup;
+	}
+
+	if (verbose_tcp_toolkit) printf(BE "Binding socket...\n");
+	result = bind(socketfd, info->ai_addr, info->ai_addrlen);
+	if (result < 0){
+		if (!silent_errors) fprintf(stderr,ER FB "Could not bind socket.\n");
+		if (!silent_errors) perror("bind");
+		goto cleanup;
+	}
+
+	if (verbose_tcp_toolkit) printf(FB"setting socket options...\n");
+	int option_value = 1;
+	if(setsockopt(socketfd,SOL_SOCKET,SO_REUSEADDR, &option_value, sizeof(option_value)) != 0){
+		if (!silent_errors) fprintf(stderr,ER FB"Could not set socket reuse.\n");
+		if (!silent_errors) perror("setsockopt");
+		goto cleanup;
+	}
+	if(setsockopt(socketfd,SOL_SOCKET,SO_BROADCAST, &option_value, sizeof(option_value)) != 0){
+		if (!silent_errors) fprintf(stderr,ER FB"Could not set socket broadcast.\n");
+		if (!silent_errors) perror("setsockopt");
+		goto cleanup;
+	}
+
+	if (verbose_tcp_toolkit) printf(FB"starting broadcast.\n");
+	int addrlen = info->ai_addrlen;
+	int bytes_received;
+	char recv_buffer[1024];
+	bytes_received = recvfrom(socketfd,recv_buffer, 1024, 0,info->ai_addr,&addrlen);
+	if (bytes_received < 0){
+		if (!silent_errors) fprintf(stderr,ER FB "Could not receive data.\n");
+		if (!silent_errors) perror("recvfrom");
+		goto cleanup;
+	}
+	
+	cleanup:
+	close(socketfd);
+	freeaddrinfo(info);
+	return return_val;
+}
