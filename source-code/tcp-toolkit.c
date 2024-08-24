@@ -512,7 +512,7 @@ char * find_broadcasters(char * port){
 		goto cleanup;
 	}
 
-	if (verbose_tcp_toolkit) printf(FB"starting broadcast.\n");
+	if (verbose_tcp_toolkit) printf(FB"listening...\n");
 	int addrlen = info->ai_addrlen;
 	int bytes_received;
 	char recv_buffer[1024];
@@ -522,7 +522,7 @@ char * find_broadcasters(char * port){
 		if (!silent_errors) perror("recvfrom");
 		goto cleanup;
 	}
-	printf("%.*s",bytes_received,recv_buffer);
+	printf("Got %d bytes, %.*s\n",bytes_received,bytes_received,recv_buffer);
 	
 	cleanup:
 	close(socketfd);
