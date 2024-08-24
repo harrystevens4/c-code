@@ -11,7 +11,7 @@ void print_help(){
 	printf("	success : ip address of found broadcast\n");
 }
 int main(int argc, char **argv){
-	verbose_tcp_toolkit = 1;
+	verbose_tcp_toolkit = 0;
 	silent_errors = 0;
 	if (argc < 2){
 		print_help();
