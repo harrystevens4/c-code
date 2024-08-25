@@ -1,0 +1,31 @@
+#!/bin/bash
+old_clip="$(wl-paste 2> /dev/null)"
+for i in {1..10}
+do
+	network-search -b "8999"
+done
+ip="$(network-search -f "8999")"
+for i in {1..10}
+do
+	network-search -b "8999"
+done
+echo "using ip $ip"
+while :
+do
+	clip="$(wl-paste 2> /dev/null)"
+	if [ "$old_clip" != "$clip" ];
+	then
+		echo "updating other clipboard"
+		old_clip="$clip"
+		echo "$clip" | network-pipe 9000
+		echo "done"
+	fi
+	newclip="$(network-pipe -q "$ip" 9000)" 
+	if [ -n "$newclip" ]; then
+		echo "clipboard updating to $newclip"
+		echo "$newclip" | wl-copy
+		old_clip="$newclip"
+		newclip=
+	fi
+	sleep 0.5
+done
