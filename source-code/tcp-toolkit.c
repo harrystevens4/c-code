@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <sys/time.h>
 #include <arpa/inet.h>
 #include <string.h>
 #include <netdb.h>
@@ -10,6 +11,7 @@
 
 int verbose_tcp_toolkit;
 int silent_errors = 0;
+int timeout = 0;
 static FILE *error_file;
 
 int make_socket(const char * host ,const char * port, struct addrinfo **res){
@@ -531,6 +533,18 @@ char * find_broadcasters(char * port){
 		if (!silent_errors) fprintf(stderr,ER FB"Could not set socket broadcast.\n");
 		if (!silent_errors) perror("setsockopt");
 		goto cleanup;
+	}
+	if (timeout > 0){
+		if (verbose_tcp_toolkit) printf(FB "Setting timeout.\n");
+		struct timeval timeout_tv;
+		timeout_tv.tv_sec = timeout;
+		timeout_tv.tv_usec = 0;
+		if (setsockopt(socketfd, SOL_SOCKET, SO_RCVTIMEO, &timeout_tv, sizeof(timeout_tv)) < 0){
+			if (!silent_errors) fprintf(stderr,ER FB "could not set timeout.\n");
+			if (!silent_errors) perror("setsockopt");
+			goto cleanup;
+		}
+		if (verbose_tcp_toolkit) printf(FB "socket timeout set.\n");
 	}
 
 	if (verbose_tcp_toolkit) printf(FB"listening...\n");

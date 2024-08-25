@@ -13,5 +13,6 @@ char * find_broadcasters(char * port);
 
 extern int verbose_tcp_toolkit; //debugging info from tcp-toolkit functions
 extern int silent_errors;
+extern int timeout;//only implemented for find_broadcasters
 
 #endif
