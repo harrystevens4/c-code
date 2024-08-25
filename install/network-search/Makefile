@@ -6,3 +6,5 @@ args.o : ../../source-code/args.c
 	gcc -c ../../source-code/args.c
 tcp-toolkit.o : ../../source-code/tcp-toolkit.c
 	gcc -c ../../source-code/tcp-toolkit.c
+install : network-search
+	@./install

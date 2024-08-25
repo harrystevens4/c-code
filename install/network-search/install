@@ -1,0 +1,6 @@
+#!/bin/bash
+if [ "$EUID" -ne "0" ]; then
+	echo "This must be run as the superuser"
+	exit 1
+fi
+cp network-search /usr/bin
