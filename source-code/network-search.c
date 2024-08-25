@@ -6,6 +6,7 @@ void print_help(){
 	printf("	network-search [options] [port]\n");
 	printf("	-b : broadcast\n");
 	printf("	-f : find active broadcasts\n");
+	printf("	-t : set 5 second timeout (only works for -f)\n");
 	printf("Return values:\n");
 	printf("	error : exit status 1\n");
 	printf("	success : ip address of found broadcast\n");
@@ -19,18 +20,27 @@ int main(int argc, char **argv){
 	}
 	struct args args;
 	parse_args(argc,argv,&args);
-	if (args.number_other != 1 || args.number_single != 1){
+	if (args.number_other < 1 || args.number_single < 1){
 		print_help();
 		return 1;
 	}
-	if (args.single[0] == 'b'){
+	for (int i =0;i<args.number_single;i++){
+	switch (args.single[i]){
+		case 'b':
 		broadcast_existence(args.other[0]);
-	}else if (args.single[0] == 'f'){
-		printf("%s\n",find_broadcasters(args.other[0]));
-	}else{
+		break;
+		case 'f':
+		char * ip_string = find_broadcasters(args.other[0]);
+		if (ip_string == NULL) return 1;
+		printf("%s\n",ip_string);
+		break;
+		case 't':
+		timeout = 5;
+		break;
+		default:
 		print_help();
 		return 1;
-	}
+	}}
 	free_args(&args);
 	
 }
