@@ -1,17 +1,20 @@
 #!/bin/bash
 old_clip="$(wl-paste 2> /dev/null)"
-for i in {1..10}
+while :
 do
 	network-search -b "8999"
-done
-ip="$(network-search -f "8999")"
-for i in {1..10}
-do
-	network-search -b "8999"
+	ip="$(network-search -tf "8999" 2> /dev/null)"
+	if [ -n "$ip" ]; then
+		break
+	fi
 done
 echo "using ip $ip"
 while :
 do
+	for i in {1..10}
+	do
+		network-search -b "8999"
+	done
 	clip="$(wl-paste 2> /dev/null)"
 	if [ "$old_clip" != "$clip" ];
 	then
