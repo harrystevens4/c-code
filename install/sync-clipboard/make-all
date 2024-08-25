@@ -1,0 +1,9 @@
+#!/bin/bash
+if [ "$EUID" -ne "0" ]; then
+	echo "Please run as superuser"
+	exit 1
+fi
+cd ../network-search/
+make install
+cd ../network-pipe/
+make install

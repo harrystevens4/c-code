@@ -1,0 +1,6 @@
+#!/bin/bash
+if [ "$EUID" -ne "0" ]; then
+	echo "Must be superuser to install"
+	exit 1
+fi
+cp sync-clipboard /usr/bin
