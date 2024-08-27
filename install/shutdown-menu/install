@@ -1,0 +1,13 @@
+#!/bin/bash
+if [ "$EUID" -ne "0" ]
+	then
+	echo "This must be run as the superuser"
+	exit 1
+fi
+cp shutdown-menu /usr/bin
+if [ "$?" -ne "0" ]; then
+	echo "Could not copy files"
+	exit 1
+fi
+echo "Installed."
+exit 0
