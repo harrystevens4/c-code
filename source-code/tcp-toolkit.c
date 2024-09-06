@@ -140,7 +140,7 @@ int connect_server_socket(char * host, char * port){
 		addr = &(ipv4->sin_addr);
 		inet_ntop(p->ai_family, addr, server_ip_address, sizeof(server_ip_address));
 		if (verbose_tcp_toolkit){
-			printf("[tcp-toolkit/connect_server_socket]: Connected to %s\n");
+			printf("[tcp-toolkit/connect_server_socket]: Connected\n");
 		}
 	}
 	if (verbose_tcp_toolkit){
@@ -177,7 +177,7 @@ int sendall(int socket, char * buffer, size_t buffer_length){
 	do{
 		bytes_sent = send(socket, buffer, buffer_length, 0);
 		if (verbose_tcp_toolkit){
-			printf("[tcp-toolkit/sendall]: sent %d/%d bytes\n",bytes_sent,buffer_length);
+			printf("[tcp-toolkit/sendall]: sent %d/%ld bytes\n",bytes_sent,buffer_length);
 		}
 		if (bytes_sent < 0){
 			fprintf(error_file,"ERROR [tcp-toolkit/sendall]: Could not send data.\n");
@@ -221,7 +221,7 @@ size_t recvall(int socket,char **buffer){
 		return 0;//returning a size_t which is unsigned
 	}
 	if (verbose_tcp_toolkit){
-		printf("[tcp-toolkit/recvall]: Got buffer size of %d\n",buffer_size);
+		printf("[tcp-toolkit/recvall]: Got buffer size of %d\n",(int)buffer_size);
 	}
 	*buffer = malloc(buffer_size);
 	do{
@@ -375,9 +375,9 @@ int recv_file(int socket, const char * filename){
 				return -1;
 			}
 			if (verbose_tcp_toolkit){
-				printf("[tcp-toolkit/recv_file]: Got %.*s.\n",buffer_length,buffer);
+				printf("[tcp-toolkit/recv_file]: Got %.*s.\n",(int)buffer_length,buffer);
 			}
-			if (fprintf(fp,"%.*s",buffer_length,buffer) < 0){
+			if (fprintf(fp,"%.*s",(int)buffer_length,buffer) < 0){
 				fprintf(error_file,"ERROR [tcp-toolkit/recv_file]: Could not write to file");
 				return -1;
 			}
