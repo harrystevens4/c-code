@@ -447,7 +447,7 @@ int broadcast_existence(char * port){
 		goto cleanup;
 	}
 
-	if (verbose_tcp_toolkit) printf(BE "Binding socket...\n");
+	/*if (verbose_tcp_toolkit) printf(BE "Binding socket...\n");
 	result = bind(socketfd, info->ai_addr, info->ai_addrlen);
 	if (result < 0){
 		if (!silent_errors) fprintf(stderr,ER BE "Could not bind socket.\n");
@@ -455,6 +455,7 @@ int broadcast_existence(char * port){
 		return_val -1;
 		goto cleanup;
 	}
+	*/
 
 	if (verbose_tcp_toolkit) printf(BE"setting socket options...\n");
 	int option_value = 1;
