@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <math.h>
 #include <arpa/inet.h>
 #include <sys/socket.h>
 #include <unistd.h>
@@ -9,35 +10,40 @@
 
 #define ERROR() fprintf(stderr,"--- ERROR ---\n")
 #define IN_MAIN() fprintf(stderr,"[main()]\n")
+#define PAYLOAD_BUFFER_SIZE 5
 
 typedef struct payload {
+	int64_t packet_number;
+	int64_t total_packets;
 	int32_t message_length;
-	char message[1024];
+	char message[PAYLOAD_BUFFER_SIZE];
 } PAYLOAD;
-int broadcast_payload(PAYLOAD * payload);
-int listen_for_payload(PAYLOAD * payload);
+
+int broadcast_payload(char *buffer, const char port[20]);
+int listen_for_payload(PAYLOAD * payload, const char port[20]);
+void display_help();
 
 int main(int argc, char **argv){
 
-	//set up the payload for transmition
-	printf("preparing payload...\n");
+	//grab the port from the argument vector
+	char port[20];
+	if (argc > 1 && argc < 4){
+		snprintf(port,20,"%s",argv[1]);
+	}else{
+		//user is incompetent
+		display_help();
+		goto cleanup;
+	}
 	PAYLOAD payload;
-	printf("clearing mem of size %ld...\n",sizeof(PAYLOAD));
-	memset(&payload,0,sizeof(PAYLOAD));
-	char message_buffer[] = "You, yes im talking to you should stop reading my packets. NOT COOL.";
-	printf("inserting message buffer...\n");
-	snprintf(payload.message,sizeof(payload.message),"%s",message_buffer);
-	printf("inserting message length...\n");
-	payload.message_length = strlen(message_buffer)+1;
-	printf("done.\n");
 
 	// decisions... decisions.
-	if (argc > 1){
-		printf("broadcasting...\n");
-		broadcast_payload(&payload);
+	if (argc > 2){
+		char buffer[] = "this is my buffer payload for transmition, pretty cool, eh?";
+		printf("transmiting payload...\n");
+		broadcast_payload(buffer,port);
 	}else{
 		printf("listening...\n");
-		int payload_len = listen_for_payload(&payload);
+		int payload_len = listen_for_payload(&payload,port);
 		if (payload_len > 0){
 			printf("payload: %s\n",payload.message);
 		}else{
@@ -46,9 +52,10 @@ int main(int argc, char **argv){
 		}
 	}
 	printf("done\n");
+	cleanup:
 	return 0;
 }
-int listen_for_payload(PAYLOAD * payload){
+int listen_for_payload(PAYLOAD * payload, const char port[20]){
 	int status;
 	int socketfd;
 
@@ -60,7 +67,7 @@ int listen_for_payload(PAYLOAD * payload){
 	hints.ai_socktype = SOCK_DGRAM;
 
 	//get address info
-	status = getaddrinfo(NULL,"7000",&hints,&info);
+	status = getaddrinfo(NULL,port,&hints,&info);
 	if (status != 0){
 		fprintf(stderr,"getaddrinfo: %s\n",gai_strerror(status));
 		return -1;
@@ -85,7 +92,7 @@ int listen_for_payload(PAYLOAD * payload){
 
 	return status;
 }
-int broadcast_payload(PAYLOAD * payload){
+int broadcast_payload(char *buffer, const char port[20]){
 	int status = 0; /* hold the return value of funcitons */
 	int socketfd;
 
@@ -100,7 +107,7 @@ int broadcast_payload(PAYLOAD * payload){
 	hints.ai_socktype = SOCK_DGRAM;
 
 	//fill in main addrinfo struct
-	status = getaddrinfo("255.255.255.255","7000",&hints,&info);
+	status = getaddrinfo("255.255.255.255",port,&hints,&info);
 	if (status != 0){
 		ERROR(); IN_MAIN();
 		fprintf(stderr,"getaddrinfo: %s\n",gai_strerror(status));
@@ -125,19 +132,39 @@ int broadcast_payload(PAYLOAD * payload){
                 goto cleanup;
 	}
 
-
-	ssize_t buffer_size_sent = sendto(socketfd,(void *)payload,sizeof(PAYLOAD),0,info->ai_addr,info->ai_addrlen);
-	if (buffer_size_sent < 0){
-		ERROR(); IN_MAIN();
-		perror("sendto");
-		status = -1;
-		goto cleanup;
+	//split up buffer into multiple packets
+	int64_t packet_count = ceil(strlen(buffer)/sizeof(PAYLOAD_BUFFER_SIZE));
+	for (int i = 0; i < packet_count; i++){
+		buffer += (i*PAYLOAD_BUFFER_SIZE);
+		PAYLOAD payload;
+		int32_t message_length = strlen(buffer);
+		if (message_length > PAYLOAD_BUFFER_SIZE){
+			message_length = PAYLOAD_BUFFER_SIZE;
+		}
+		memset(&payload,0,sizeof(PAYLOAD));
+		payload.total_packets = packet_count;
+		payload.packet_number = i;
+		payload.message_length = message_length;
+		snprintf(payload.message,PAYLOAD_BUFFER_SIZE,"%s",buffer);
+		ssize_t buffer_size_sent = sendto(socketfd,(void *)&payload,sizeof(PAYLOAD),0,info->ai_addr,info->ai_addrlen);
+		if (buffer_size_sent < 0){
+			ERROR(); IN_MAIN();
+			perror("sendto");
+			status = -1;
+			goto cleanup;
+		}
+		printf("sent %ld bytes\n",buffer_size_sent);
 	}
-	printf("sent %ld bytes\n",buffer_size_sent);
 
 	/* free any memory before the program ends */
 	cleanup:
 	freeaddrinfo(info);
 	close(socketfd);
 	return status;
+}
+void display_help(){
+	printf("usage:\
+	udp-broadcast <port> [message]\
+	not specifying a message will result in the program listening for broadcasts\
+	\n");
 }
