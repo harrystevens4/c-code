@@ -20,7 +20,7 @@ typedef struct payload {
 } PAYLOAD;
 
 int broadcast_payload(char *buffer, const char port[20]);
-int listen_for_payload(PAYLOAD * payload, const char port[20]);
+int listen_for_payload(char **buffer, const char port[20]);
 void display_help();
 
 int main(int argc, char **argv){
@@ -34,7 +34,6 @@ int main(int argc, char **argv){
 		display_help();
 		goto cleanup;
 	}
-	PAYLOAD payload;
 
 	// decisions... decisions.
 	if (argc > 2){
@@ -43,9 +42,10 @@ int main(int argc, char **argv){
 		broadcast_payload(buffer,port);
 	}else{
 		printf("listening...\n");
-		int payload_len = listen_for_payload(&payload,port);
+		char *buffer;
+		int payload_len = listen_for_payload(&buffer,port);
 		if (payload_len > 0){
-			printf("payload: %s\n",payload.message);
+			printf("payload: %s\n",buffer);
 		}else{
 			printf("could not get data.\n");
 			return 1;
@@ -55,7 +55,7 @@ int main(int argc, char **argv){
 	cleanup:
 	return 0;
 }
-int listen_for_payload(PAYLOAD * payload, const char port[20]){
+int listen_for_payload(char **buffer, const char port[20]){
 	int status;
 	int socketfd;
 
@@ -88,7 +88,24 @@ int listen_for_payload(PAYLOAD * payload, const char port[20]){
 	}
 
 	//listen for the data
-	status = recvfrom(socketfd, payload,sizeof(PAYLOAD),0,info->ai_addr,&(info->ai_addrlen));
+	uint8_t got_all_packets = 0;
+	uint8_t buffer_allocated = 0;
+	int count = 0;
+	int total_packets = 0;
+	do{
+		PAYLOAD payload;
+		status = recvfrom(socketfd, &payload,sizeof(PAYLOAD),0,info->ai_addr,&(info->ai_addrlen));
+		if (!buffer_allocated){
+			buffer_allocated = 1;
+			total_packets = payload.total_packets;
+			*buffer = malloc(sizeof(char)*(payload.total_packets)*PAYLOAD_BUFFER_SIZE);
+		}
+		strncpy(*buffer+(payload.packet_number*PAYLOAD_BUFFER_SIZE),payload.message,payload.message_length);
+		count += 1;
+		if (count >= total_packets){
+			got_all_packets = 1;
+		}
+	}while(!got_all_packets);
 
 	return status;
 }
@@ -135,7 +152,6 @@ int broadcast_payload(char *buffer, const char port[20]){
 	//split up buffer into multiple packets
 	int64_t packet_count = ceil(strlen(buffer)/sizeof(PAYLOAD_BUFFER_SIZE));
 	for (int i = 0; i < packet_count; i++){
-		buffer += (i*PAYLOAD_BUFFER_SIZE);
 		PAYLOAD payload;
 		int32_t message_length = strlen(buffer);
 		if (message_length > PAYLOAD_BUFFER_SIZE){
@@ -145,7 +161,7 @@ int broadcast_payload(char *buffer, const char port[20]){
 		payload.total_packets = packet_count;
 		payload.packet_number = i;
 		payload.message_length = message_length;
-		snprintf(payload.message,PAYLOAD_BUFFER_SIZE,"%s",buffer);
+		strncpy(payload.message,buffer,PAYLOAD_BUFFER_SIZE);
 		ssize_t buffer_size_sent = sendto(socketfd,(void *)&payload,sizeof(PAYLOAD),0,info->ai_addr,info->ai_addrlen);
 		if (buffer_size_sent < 0){
 			ERROR(); IN_MAIN();
@@ -153,7 +169,8 @@ int broadcast_payload(char *buffer, const char port[20]){
 			status = -1;
 			goto cleanup;
 		}
-		printf("sent %ld bytes\n",buffer_size_sent);
+		printf("sent %ld bytes, message: %s\n",buffer_size_sent,payload.message);
+		buffer += PAYLOAD_BUFFER_SIZE;
 	}
 
 	/* free any memory before the program ends */
