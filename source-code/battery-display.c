@@ -51,6 +51,7 @@ int activate(GtkApplication *app,gpointer user_data){
 	GtkWidget *label = gtk_label_new(label_string);
 	GtkWidget *battery_level_bar_widget = gtk_level_bar_new();
 	GtkLevelBar *batter_level_bar = GTK_LEVEL_BAR(battery_level_bar_widget);
+	gtk_level_bar_set_value(batter_level_bar,(float)get_battery_percent()/100);
 
 	//display widgets
 	gtk_box_append(GTK_BOX(box), label);
