@@ -56,7 +56,10 @@ int activate(GtkApplication *app,gpointer user_data){
 	//set up window
 	GtkWidget *window;
 	window = gtk_application_window_new(app); //GTK_WINDOW_TOPLEVEL
-	gtk_window_set_default_size(GTK_WINDOW(window),200,80);
+	gtk_window_set_default_size(GTK_WINDOW(window),180,70);
+	gtk_window_set_title(GTK_WINDOW(window),"Battery");
+	
+	//create the grid
 	GtkWidget *box;
 	box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	gtk_window_set_child(GTK_WINDOW(window), box);
