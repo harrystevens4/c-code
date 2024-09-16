@@ -1,6 +1,23 @@
 #include <stdio.h>
 #include <gtk/gtk.h>
 #include <unistd.h>
+int get_battery_percent();
+int update_battery_label(gpointer user_data){
+	int battery_percent = get_battery_percent();
+
+	GtkLabel *battery_label = GTK_LABEL(user_data);
+	gchar *text = g_strdup_printf("Battery level: %d%%",battery_percent);
+	gtk_label_set_label(battery_label,text);
+	g_free(text);
+	return G_SOURCE_CONTINUE;
+}
+int update_battery_bar(gpointer user_data){
+	int battery_percent = get_battery_percent();
+
+	GtkLevelBar *battery_level_bar = GTK_LEVEL_BAR(user_data);
+	gtk_level_bar_set_value(battery_level_bar,(float)battery_percent/100);
+	return G_SOURCE_CONTINUE;
+}
 int get_battery_percent(){
 	if (access("/sys/class/power_supply/BAT0/charge_now",F_OK) != 0){
 		fprintf(stderr,"ERROR: could not open the battery level file.\n");
@@ -38,7 +55,7 @@ int activate(GtkApplication *app,gpointer user_data){
 	
 	//set up window
 	GtkWidget *window;
-	window = gtk_application_window_new(app);
+	window = gtk_application_window_new(app); //GTK_WINDOW_TOPLEVEL
 	GtkWidget *box;
 	box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	gtk_window_set_child(GTK_WINDOW(window), box);
@@ -47,11 +64,14 @@ int activate(GtkApplication *app,gpointer user_data){
 
 	//make widgets
 	char label_string[1024];
-	snprintf(label_string,1024,"Battery level: %d%%",get_battery_percent());
+	snprintf(label_string,1024,"",get_battery_percent());
 	GtkWidget *label = gtk_label_new(label_string);
 	GtkWidget *battery_level_bar_widget = gtk_level_bar_new();
-	GtkLevelBar *batter_level_bar = GTK_LEVEL_BAR(battery_level_bar_widget);
-	gtk_level_bar_set_value(batter_level_bar,(float)get_battery_percent()/100);
+	GtkLevelBar *battery_level_bar = GTK_LEVEL_BAR(battery_level_bar_widget);
+
+	//set up main update loop
+	g_timeout_add(1000,update_battery_label,label);
+	g_timeout_add(1000,update_battery_bar,battery_level_bar);
 
 	//display widgets
 	gtk_box_append(GTK_BOX(box), label);
