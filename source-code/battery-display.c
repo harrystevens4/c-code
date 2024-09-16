@@ -56,6 +56,7 @@ int activate(GtkApplication *app,gpointer user_data){
 	//set up window
 	GtkWidget *window;
 	window = gtk_application_window_new(app); //GTK_WINDOW_TOPLEVEL
+	gtk_window_set_default_size(GTK_WINDOW(window),200,80);
 	GtkWidget *box;
 	box = gtk_box_new(GTK_ORIENTATION_VERTICAL, 0);
 	gtk_window_set_child(GTK_WINDOW(window), box);
@@ -64,7 +65,7 @@ int activate(GtkApplication *app,gpointer user_data){
 
 	//make widgets
 	char label_string[1024];
-	snprintf(label_string,1024,"",get_battery_percent());
+	snprintf(label_string,1024,"checking battery...",get_battery_percent());
 	GtkWidget *label = gtk_label_new(label_string);
 	GtkWidget *battery_level_bar_widget = gtk_level_bar_new();
 	GtkLevelBar *battery_level_bar = GTK_LEVEL_BAR(battery_level_bar_widget);
