@@ -4,6 +4,9 @@
 int get_battery_percent();
 int update_battery_label(gpointer user_data){
 	int battery_percent = get_battery_percent();
+	if (battery_percent < 0){
+		battery_percent = 100;//if errors occured default to 100%
+	}
 
 	GtkLabel *battery_label = GTK_LABEL(user_data);
 	gchar *text = g_strdup_printf("Battery level: %d%%",battery_percent);
@@ -13,6 +16,9 @@ int update_battery_label(gpointer user_data){
 }
 int update_battery_bar(gpointer user_data){
 	int battery_percent = get_battery_percent();
+	if (battery_percent < 0){
+		battery_percent = 100;
+	}
 
 	GtkLevelBar *battery_level_bar = GTK_LEVEL_BAR(user_data);
 	gtk_level_bar_set_value(battery_level_bar,(float)battery_percent/100);
@@ -36,12 +42,14 @@ int get_battery_percent(){
 	int buffer_size = fread(buffer,1,1024,charge_now_fd);
 	if (buffer_size == 0){
 		fprintf(stderr,"ERROR: Could not read file.\n");
+		return -1;
 	}
 	int charge_now = strtol(buffer,NULL,10);
 	
 	buffer_size = fread(buffer,1,1024,charge_full_fd);
 	if (buffer_size == 0){
 		fprintf(stderr,"ERROR: Could not read file.\n");
+		return -1;
 	}
 	int charge_full = strtol(buffer,NULL,10);
 
