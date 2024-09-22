@@ -11,6 +11,7 @@
 #define ERROR() fprintf(stderr,"--- ERROR ---\n")
 #define IN_MAIN() fprintf(stderr,"[main()]\n")
 #define PAYLOAD_BUFFER_SIZE 5
+#define VERB if(verbose)
 
 typedef struct payload {
 	int64_t packet_number;
@@ -18,6 +19,7 @@ typedef struct payload {
 	int32_t message_length;
 	char message[PAYLOAD_BUFFER_SIZE];
 } PAYLOAD;
+int verbose = 0;
 
 int broadcast_payload(char *buffer, const char port[20]);
 int listen_for_payload(char **buffer, const char port[20]);
@@ -37,21 +39,21 @@ int main(int argc, char **argv){
 
 	// decisions... decisions.
 	if (argc > 2){
-		char buffer[] = "this is my buffer payload for transmition, pretty cool, eh?";
-		printf("transmiting payload...\n");
-		broadcast_payload(buffer,port);
+		//char buffer[] = "this is my buffer payload for transmition, pretty cool, eh?";
+		VERB printf("transmiting payload...\n");
+		broadcast_payload(argv[2],port);
 	}else{
-		printf("listening...\n");
+		VERB printf("listening...\n");
 		char *buffer;
 		int payload_len = listen_for_payload(&buffer,port);
 		if (payload_len > 0){
-			printf("payload: %s\n",buffer);
+			printf("%s\n",buffer);
 		}else{
-			printf("could not get data.\n");
+			VERB printf("could not get data.\n");
 			return 1;
 		}
 	}
-	printf("done\n");
+	VERB printf("done\n");
 	cleanup:
 	return 0;
 }
@@ -169,7 +171,7 @@ int broadcast_payload(char *buffer, const char port[20]){
 			status = -1;
 			goto cleanup;
 		}
-		printf("sent %ld bytes, message: %s\n",buffer_size_sent,payload.message);
+		VERB printf("sent %ld bytes, message: %s\n",buffer_size_sent,payload.message);
 		buffer += PAYLOAD_BUFFER_SIZE;
 	}
 
