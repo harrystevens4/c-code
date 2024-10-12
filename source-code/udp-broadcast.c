@@ -152,10 +152,10 @@ int broadcast_payload(char *buffer, const char port[20]){
 	}
 
 	//split up buffer into multiple packets
-	int64_t packet_count = ceil(strlen(buffer)/sizeof(PAYLOAD_BUFFER_SIZE));
+	int64_t packet_count = ceil((strlen(buffer)+1)/sizeof(PAYLOAD_BUFFER_SIZE));
 	for (int i = 0; i < packet_count; i++){
 		PAYLOAD payload;
-		int32_t message_length = strlen(buffer);
+		int32_t message_length = strlen(buffer)+1;
 		if (message_length > PAYLOAD_BUFFER_SIZE){
 			message_length = PAYLOAD_BUFFER_SIZE;
 		}
