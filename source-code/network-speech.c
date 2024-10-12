@@ -29,7 +29,10 @@ int recv_broadcast(int socketfd, char **buffer, struct addrinfo *info);
 void free_recv_broadcast();
 
 int main(int argc, char**argv){
-	//get user
+	//daemonise (fork and kill stdin and stdout)
+	daemon(1,0);
+
+	//------------------------ setup ------------------------
 	char *user = getenv("USER");
 	if (user == NULL){
 		fprintf(stderr,"FATAL: Could not get user.\n");
@@ -43,24 +46,30 @@ int main(int argc, char**argv){
 		fprintf(stderr,"FATAL: Could not start a network socket.\n");
 		return 1;
 	}
-	//listen for a message
-	char *buffer;
-	recv_broadcast(socket_fd,&buffer,address);
-	printf("%s\n",buffer);
-	free(buffer);
-	freeaddrinfo(address);
 
 	//connect to the speech dispatcher
 	SPDConnection *dispatcher;
 	//                    client_name        connection_name user
 	dispatcher = spd_open("dispatch-speech", "main",         (const char *)user,SPD_MODE_SINGLE);
+	
+	//------------------------- mainloop -------------------------
+	for (;;){
+		//listen for a message
+		char *buffer;
+		recv_broadcast(socket_fd,&buffer,address);//mallocs the buffer
+		printf("%s\n",buffer);
 
-	//send a message
-	SPDPriority priority = SPD_TEXT;
-	spd_say(dispatcher,priority,"");
+		//send said message
+		SPDPriority priority = SPD_TEXT;
+		spd_say(dispatcher,priority,buffer);
 
-	//cleanup
+		//release memory to prevent leaks from overwriting malloc
+		free(buffer);
+	}
+
+	//---------------------------- cleanup --------------------------
 	spd_close(dispatcher);
+	freeaddrinfo(address);
 	return 0;
 }
 
@@ -106,6 +115,7 @@ int recv_broadcast(int socketfd, char **buffer, struct addrinfo *info){
 	int total_packets = 0;
 	do{
 		PAYLOAD payload;
+		memset(&payload,0,sizeof(PAYLOAD));
 		status = recvfrom(socketfd, &payload,sizeof(PAYLOAD),0,info->ai_addr,&(info->ai_addrlen));
 		if (status < 0){
 			perror("recvfrom");
