@@ -1,0 +1,6 @@
+#!/bin/bash
+if [ "$EUID" -ne "0" ]; then
+	echo "Must be run as superuser."
+	exit
+fi
+cp network-speech /usr/bin/network-speech
