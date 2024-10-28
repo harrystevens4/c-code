@@ -8,7 +8,8 @@
 #include <sys/types.h>
 #include <stdlib.h>
 
-#define PORT "7396"
+#define SEARCH_PORT "7396"
+#define TRANSFER_PORT "7397"
 
 struct advertisement {
 	char hostname[256];
@@ -49,26 +50,39 @@ int sender_main(char *filename){
 		return 1;
 	}
 
-	pthread_join(agent_thread,NULL);
-
 	//===================== start a server socket ================
 	struct addrinfo hints, *address_info;
 	memset(&hints,0,sizeof(struct addrinfo));
 	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
-	result = getaddrinfo(NULL,PORT,&hints,&address_info);
+	result = getaddrinfo(NULL,TRANSFER_PORT,&hints,&address_info);
 	if (result < 0){
 		fprintf(stderr,"getaddrinfo: %s\n",gai_strerror(result));
 		return 1;
 	}
 	int server = socket(address_info->ai_family,address_info->ai_socktype,0);
-	//bind();
-	//listen();
-	//accept();
+	result = bind(server,address_info->ai_addr,address_info->ai_addrlen);
+	if (result < 0){
+		perror("bind");
+		close(server);
+		return 1;
+	}
+	result = listen(server,1);
+	if (result < 0){
+		perror("listen");
+		close(server);
+		return 1;
+	}
+	int client = accept(server,address_info->ai_addr,&address_info->ai_addrlen);
+	if (client < 0){
+		perror("accept");
+		return 1;
+	}
+	printf("client found.\n");
 	continue_advertising = 0;
+	pthread_join(agent_thread,NULL);
 	return 0;
-
 }
 int receiver_main(){
 	//======== setup a broadcast listening socket ================
@@ -77,7 +91,7 @@ int receiver_main(){
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
 
-	int result = getaddrinfo("255.255.255.255",PORT,&hints,&address_info);
+	int result = getaddrinfo("255.255.255.255",SEARCH_PORT,&hints,&address_info);
 	if (result < 0){
 		fprintf(stderr,"getaddrinfo: %s\n",gai_strerror(result));
 		return 1;
@@ -115,7 +129,7 @@ int receiver_main(){
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 
-	result = getaddrinfo(data.hostname,PORT,&hints,&address_info);
+	result = getaddrinfo(data.hostname,TRANSFER_PORT,&hints,&address_info);
 	if (result < 0){
 		fprintf(stderr,"getaddrinfo: %s\n",gai_strerror(result));
 		return 1;
@@ -141,7 +155,7 @@ void *advertising_agent(void *args){
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_DGRAM;
 
-	int result = getaddrinfo("255.255.255.255",PORT,&hints,&address_info);
+	int result = getaddrinfo("255.255.255.255",SEARCH_PORT,&hints,&address_info);
 	if (result < 0){
 		fprintf(stderr,"getaddrinfo: %s\n",gai_strerror(result));
 		return (void *)1;
