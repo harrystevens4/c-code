@@ -11,8 +11,8 @@
 #define PORT "7396"
 
 struct advertisement {
-	char ip[16];
-	char filename[255];
+	char hostname[256];
+	char filename[256];
 };
 
 volatile int continue_advertising = 0;
@@ -49,9 +49,24 @@ int sender_main(char *filename){
 		return 1;
 	}
 
-	sleep(5);
-	continue_advertising = 0;
 	pthread_join(agent_thread,NULL);
+
+	//===================== start a server socket ================
+	struct addrinfo hints, *address_info;
+	memset(&hints,0,sizeof(struct addrinfo));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_DGRAM;
+	hints.ai_flags = AI_PASSIVE;
+	result = getaddrinfo(NULL,PORT,&hints,&address_info);
+	if (result < 0){
+		fprintf(stderr,"getaddrinfo: %s\n",gai_strerror(result));
+		return 1;
+	}
+	int server = socket(address_info->ai_family,address_info->ai_socktype,0);
+	//bind();
+	//listen();
+	//accept();
+	continue_advertising = 0;
 	return 0;
 
 }
@@ -80,19 +95,42 @@ int receiver_main(){
 		return 1;
 	}
 
+	struct advertisement data;
 	//========= listen for available connections ========
 	for (;;){
-		struct advertisement data;
 		int result = recvfrom(broadcast_fd,&data,sizeof(struct advertisement),0, address_info->ai_addr, &address_info->ai_addrlen);
 		if (result < 0){
 			perror("recvfrom");
 			close(broadcast_fd);
 			return 1;
 		}
-		printf("sender found at %s, with file %s. keep listening? (y/n)\n",data.ip,data.filename);
+		printf("sender %s found, with file %s. keep listening for another? (y/n)\n",data.hostname,data.filename);
 		if (fgetc(stdin) == 'n') break;
 	}
+	freeaddrinfo(address_info);
+	close(broadcast_fd);
+
 	//======== connect to the tcp socket ===============
+	memset(&hints,0,sizeof(struct addrinfo));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+
+	result = getaddrinfo(data.hostname,PORT,&hints,&address_info);
+	if (result < 0){
+		fprintf(stderr,"getaddrinfo: %s\n",gai_strerror(result));
+		return 1;
+	}
+
+	int server = socket(address_info->ai_family,address_info->ai_socktype,0);
+	if (socket < 0){
+		perror("socket");
+		return 1;
+	}
+	result = connect(server, address_info->ai_addr, address_info->ai_addrlen);
+	if (result < 0){
+		perror("connect");
+		close(server);
+	}
 	return 0;
 }
 void *advertising_agent(void *args){
@@ -125,8 +163,16 @@ void *advertising_agent(void *args){
 	printf("ready to broadcast\n");
 	for (;continue_advertising == 1;){
 		struct advertisement data;
-		snprintf(data.ip,16,"epic ip");
-		snprintf(data.filename,255,"filename");
+		char hostname[256];
+		result = gethostname(hostname, sizeof(hostname));
+		if (result != 0){
+			perror("gethostname");
+			close(broadcast_fd);
+			return (void *)1;
+		}
+
+		snprintf(data.hostname,256,"%s",hostname);
+		snprintf(data.filename,256,"filename");
 		result = sendto(broadcast_fd,&data,sizeof(struct advertisement),0,address_info->ai_addr,address_info->ai_addrlen);
 		if (result < 0){
 			perror("sendto");
@@ -136,5 +182,7 @@ void *advertising_agent(void *args){
 		sleep(1);
 	}
 	close(broadcast_fd);
+	freeaddrinfo(address_info);
 	printf("agent terminated.\n");
+	
 }
