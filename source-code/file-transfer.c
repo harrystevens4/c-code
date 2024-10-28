@@ -10,10 +10,17 @@
 
 #define SEARCH_PORT "7396"
 #define TRANSFER_PORT "7397"
+#define CHUNK_SIZE 24
 
 struct advertisement {
 	char hostname[256];
 	char filename[256];
+};
+struct file_chunk {
+	uint8_t done;
+	uint32_t chunk_number;
+	uint32_t data_size;
+	char data[CHUNK_SIZE];
 };
 
 volatile int continue_advertising = 0;
@@ -22,6 +29,8 @@ void print_help();
 int sender_main(char *);
 int receiver_main();
 void *advertising_agent(void* args);
+int send_file(int sock, char *filename);
+int recv_file(int sock, char *filename);
 
 int main(int argc, char **argv){
 	if (argc > 3){
@@ -44,7 +53,7 @@ int sender_main(char *filename){
 	//start broadcasting agent
 	continue_advertising = 1;
 	pthread_t agent_thread;
-	int result = pthread_create(&agent_thread,NULL,advertising_agent,NULL);
+	int result = pthread_create(&agent_thread,NULL,advertising_agent,(void *)filename);
 	if (result < 0){
 		perror("pthread_create");
 		return 1;
@@ -82,6 +91,11 @@ int sender_main(char *filename){
 	printf("client found.\n");
 	continue_advertising = 0;
 	pthread_join(agent_thread,NULL);
+	
+	//====== transfer the file =======
+	send_file(client,filename);
+	close(client);
+
 	return 0;
 }
 int receiver_main(){
@@ -145,9 +159,12 @@ int receiver_main(){
 		perror("connect");
 		close(server);
 	}
+	recv_file(server,data.filename);
+	close(server);
 	return 0;
 }
 void *advertising_agent(void *args){
+	char *filename = (char *)args;
 	printf("started advertising agent.\n");
 	//============= build a sock_dgram to broadcast on =========
 	struct addrinfo hints, *address_info;
@@ -186,7 +203,7 @@ void *advertising_agent(void *args){
 		}
 
 		snprintf(data.hostname,256,"%s",hostname);
-		snprintf(data.filename,256,"filename");
+		snprintf(data.filename,256,"%s",filename);
 		result = sendto(broadcast_fd,&data,sizeof(struct advertisement),0,address_info->ai_addr,address_info->ai_addrlen);
 		if (result < 0){
 			perror("sendto");
@@ -199,4 +216,70 @@ void *advertising_agent(void *args){
 	freeaddrinfo(address_info);
 	printf("agent terminated.\n");
 	
+}
+int send_file(int sock, char *filename){
+	FILE *fp = fopen(filename,"r");
+	if (fp == NULL){
+		perror("fopen");
+		return 1;
+	}
+	for (int chunk_number = 0;;chunk_number++){
+		struct file_chunk buffer;
+		buffer.done = 0;
+		buffer.chunk_number = chunk_number;
+		if (feof(fp)){
+			break;
+		}
+		int result = fread(buffer.data,1,CHUNK_SIZE,fp);
+		if (result < 0){
+			perror("fread");
+			fclose(fp);
+			return 1;
+		}
+		buffer.data_size = result;
+
+		result = write(sock,&buffer,sizeof(struct file_chunk));
+		if (result < 0){
+			perror("write");
+			fclose(fp);
+			return 1;
+		}
+	}
+	struct file_chunk buffer;
+	buffer.done = 1;
+	int result = write(sock,&buffer,sizeof(struct file_chunk));
+	if (result < 0){
+		perror("write");
+		fclose(fp);
+		return 1;
+	}
+
+	fclose(fp);
+	return 0;
+}
+int recv_file(int sock, char *filename){
+	FILE *fp = fopen(filename,"w");
+	if (fp == NULL){
+		return 1;
+	}
+	for (;;){
+		struct file_chunk buffer;
+		int result = read(sock,&buffer,sizeof(struct file_chunk));
+		if (result < 0){
+			perror("read");
+			fclose(fp);
+			return 1;
+		}
+		if (buffer.done == 1){
+			break;
+		}
+		result = fwrite(buffer.data,1,buffer.data_size,fp);
+		if (result < 0){
+			perror("fwrite");
+			fclose(fp);
+			return 1;
+		}
+	}
+	fclose(fp);
+	return 0;
 }
