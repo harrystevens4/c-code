@@ -351,7 +351,7 @@ int recv_file(int sock, char *filename){
 		//---------- receive an individual packet ---------
 		//TODO packets are misaligned when reconstructed
 		for (;;){
-			int result = recv(sock,&recv_buffer,recv_buffer_size,0);
+			int result = recv(sock,recv_buffer,recv_buffer_size,0);
 			if (result < 0){
 				perror("read");
 				fclose(fp);
