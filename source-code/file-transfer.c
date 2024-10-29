@@ -14,7 +14,7 @@
 #define SEARCH_PORT "7396"
 #define TRANSFER_PORT "7397"
 #define CHUNK_SIZE 1024
-#define MAX_CONSECUTIVE_PACKETS 30
+#define MAX_CONSECUTIVE_PACKETS 10
 
 struct advertisement {
 	char hostname[256];
