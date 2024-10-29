@@ -1,6 +1,7 @@
 #include <stdio.h>
 #include <sys/ioctl.h>
 #include <time.h>
+#include <sys/time.h>
 #include <errno.h>
 #include <libgen.h>
 #include <pthread.h>
@@ -400,10 +401,24 @@ long long int get_filesize(char *filename){
 	fclose(fp);
 	return size;
 }
-void render_progress(float percent){
+void render_progress(float percent){ //decimal like 0.2
+	static unsigned long start_time_us = 0;
+	static float last_percent;
 	struct winsize term_size;
 	int result = ioctl(STDOUT_FILENO, TIOCGWINSZ, &term_size);
-	int progress_width = term_size.ws_col-2;
+	int progress_width = term_size.ws_col-12;
+	int time_remaining_width = term_size.ws_col-progress_width;
+	//======= figure out time remaining =======
+	struct timeval tv;
+	gettimeofday(&tv,NULL);
+	unsigned long time_us = (1000000*tv.tv_sec) + tv.tv_usec;
+	if (start_time_us == 0){
+		start_time_us = time_us-1;
+	}
+	unsigned long time_difference_us = time_us-start_time_us;
+	unsigned long time_remaining = ((0-(1-(1/(percent+0.01))))*time_difference_us)/1000000; //dont divide by 0
+
+	//======== show bar =======
 	if (result < 0){
 		perror("ioctl");
 		return;
@@ -413,9 +428,12 @@ void render_progress(float percent){
 	for (i = 0; i < percent*progress_width; i++){
 		putchar('=');
 	}
-	for (; i < term_size.ws_col-2; i++){
+	for (; i < progress_width; i++){
 		putchar(' ');
 	}
+	//======= show time remaining =====
 	putchar(']');
+	printf("%*lds",time_remaining_width-3,time_remaining);
 	fflush(stdout);
+	//for next call
 }
