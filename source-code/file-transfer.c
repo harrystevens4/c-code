@@ -15,7 +15,7 @@
 
 #define SEARCH_PORT "7396"
 #define TRANSFER_PORT "7397"
-#define CHUNK_SIZE 4096
+#define CHUNK_SIZE 8192
 #define MAX_CONSECUTIVE_PACKETS 2
 #define PROGRESS_UPDATE_INTERVAL 20
 
@@ -283,15 +283,23 @@ int send_file(int sock, char *filename){
 		}
 		buffer.data_size = result;
 
-		char *transmit_buffer;
+		char *transmit_buffer = (char *)&buffer;
 		int transmit_buffer_size = sizeof(struct file_chunk);
-		result = send(sock,&buffer,sizeof(struct file_chunk),0);
-		//printf("sent %d bytes\n",result);
-		if (result < transmit_buffer_size){
-			printf("error %d\n",errno);
-			perror("write");
-			fclose(fp);
-			return 1;
+		for (;;){
+			result = send(sock,transmit_buffer,transmit_buffer_size,0);
+			//printf("sent %d bytes\n",result);
+			if (result < 0){
+				printf("error %d\n",errno);
+				perror("write");
+				fclose(fp);
+				return 1;
+			}else if (result < transmit_buffer_size){
+				transmit_buffer += result;
+				transmit_buffer_size -= result;
+				continue;
+			}else{
+				break;
+			}
 		}
 		if (chunk_number >= PROGRESS_UPDATE_INTERVAL){
 			float progress_percent = (float)ftell(fp)/(float)(filesize);
