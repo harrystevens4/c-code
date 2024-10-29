@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <sys/ioctl.h>
 #include <time.h>
 #include <errno.h>
 #include <libgen.h>
@@ -15,6 +16,7 @@
 #define TRANSFER_PORT "7397"
 #define CHUNK_SIZE 1024
 #define MAX_CONSECUTIVE_PACKETS 0
+#define PROGRESS_UPDATE_INTERVAL 20
 
 struct advertisement {
 	char hostname[256];
@@ -24,6 +26,7 @@ struct file_chunk {
 	uint8_t done;
 	uint8_t ack_required;
 	uint32_t data_size;
+	uint64_t filesize;
 	char data[CHUNK_SIZE];
 };
 struct acknowledgement {
@@ -38,6 +41,7 @@ int receiver_main();
 void *advertising_agent(void* args);
 int send_file(int sock, char *filename);
 int recv_file(int sock, char *filename);
+long long int get_filesize(char *filename);
 
 int main(int argc, char **argv){
 	if (argc > 3){
@@ -244,6 +248,11 @@ void *advertising_agent(void *args){
 	
 }
 int send_file(int sock, char *filename){
+	long long int filesize = get_filesize(filename);
+	if (filesize < 0){
+		return 1;
+	}
+	printf("filesize: %lld\n",filesize);
 	FILE *fp = fopen(filename,"r");
 	if (fp == NULL){
 		perror("fopen");
@@ -259,6 +268,7 @@ int send_file(int sock, char *filename){
 			buffer.ack_required = 0;
 		}
 		buffer.done = 0;
+		buffer.filesize = filesize;
 		if (feof(fp)){
 			break;
 		}
@@ -314,6 +324,13 @@ int recv_file(int sock, char *filename){
 	if (fp == NULL){
 		return 1;
 	}
+	struct winsize term_size;
+	int result = ioctl(STDOUT_FILENO, TIOCGWINSZ, &term_size);
+	if (result < 0){
+		perror("ioctl");
+		return 1;
+	}
+	int packet = 0;
 	for (;;){
 		struct file_chunk buffer;
 		memset(&buffer,0,sizeof(struct file_chunk));
@@ -340,6 +357,19 @@ int recv_file(int sock, char *filename){
 			fclose(fp);
 			return 1;
 		}
+		
+		//-------- render a percent bar every PROGRESS_UPDATE_INTERVAL ------
+		if (packet >= PROGRESS_UPDATE_INTERVAL){
+			float progress_percent = (float)ftell(fp)/(float)(buffer.filesize);
+			packet = 0;
+			printf("\r");
+			for (int i = 0; i < progress_percent*term_size.ws_col; i++){
+				putchar('=');
+			}
+		}
+		packet++;
+			
+
 		if (buffer.ack_required == 1){
 			//printf("sending ack\n");
 			struct acknowledgement ack;
@@ -352,5 +382,24 @@ int recv_file(int sock, char *filename){
 		}
 	}
 	fclose(fp);
+	printf("\n");
 	return 0;
+}
+long long int get_filesize(char *filename){
+	FILE *fp = fopen(filename,"r");
+	if (fp == NULL){
+		perror("fopen");
+		return -1;
+	}
+	int result = fseek(fp,0,SEEK_END);
+	if (result < 0){
+		perror("fseek");
+		return -1;
+	}
+	long long int size = ftell(fp);
+	if (size < 0){
+		perror("ftell");
+	}
+	fclose(fp);
+	return size;
 }
