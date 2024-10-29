@@ -14,7 +14,7 @@
 #define SEARCH_PORT "7396"
 #define TRANSFER_PORT "7397"
 #define CHUNK_SIZE 1024
-#define MAX_CONSECUTIVE_PACKETS 10
+#define MAX_CONSECUTIVE_PACKETS 0
 
 struct advertisement {
 	char hostname[256];
@@ -252,6 +252,7 @@ int send_file(int sock, char *filename){
 	int packet = 0;
 	for (int chunk_number = 0;;chunk_number++){
 		struct file_chunk buffer;
+		memset(&buffer,0,sizeof(struct file_chunk));
 		if (packet >= MAX_CONSECUTIVE_PACKETS){
 			buffer.ack_required = 1;
 		}else{
@@ -272,7 +273,7 @@ int send_file(int sock, char *filename){
 		char *transmit_buffer;
 		int transmit_buffer_size = sizeof(struct file_chunk);
 		result = send(sock,&buffer,sizeof(struct file_chunk),0);
-		printf("sent %d bytes\n",result);
+		//printf("sent %d bytes\n",result);
 		if (result < transmit_buffer_size){
 			printf("error %d\n",errno);
 			perror("write");
@@ -281,7 +282,7 @@ int send_file(int sock, char *filename){
 		}
 		if (packet >= MAX_CONSECUTIVE_PACKETS){
 			struct acknowledgement ack;
-			printf("waiting for ack...\n");
+			//printf("waiting for ack...\n");
 			int result = recv(sock,&ack,sizeof(struct acknowledgement),0);
 			if (result < 0){
 				perror("recv");
@@ -332,7 +333,7 @@ int recv_file(int sock, char *filename){
 			printf("failure in transmition: buffer.done at %d\n",buffer.done);
 			break;
 		}
-		printf("writing %d bytes\n",buffer.data_size);
+		//printf("writing %d bytes\n",buffer.data_size);
 		result = fwrite(buffer.data,1,buffer.data_size,fp);
 		if (result < 0){
 			perror("fwrite");
@@ -340,7 +341,7 @@ int recv_file(int sock, char *filename){
 			return 1;
 		}
 		if (buffer.ack_required == 1){
-			printf("sending ack\n");
+			//printf("sending ack\n");
 			struct acknowledgement ack;
 			result = send(sock,&ack,sizeof(struct acknowledgement),0);
 			if (result < 0){
