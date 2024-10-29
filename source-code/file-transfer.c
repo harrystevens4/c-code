@@ -15,7 +15,7 @@
 
 #define SEARCH_PORT "7396"
 #define TRANSFER_PORT "7397"
-#define CHUNK_SIZE 2048
+#define CHUNK_SIZE 4096
 #define MAX_CONSECUTIVE_PACKETS 0
 #define PROGRESS_UPDATE_INTERVAL 20
 
@@ -349,8 +349,9 @@ int recv_file(int sock, char *filename){
 		char *recv_buffer = (char *)&buffer;
 		int recv_buffer_size = sizeof(struct file_chunk);
 		//---------- receive an individual packet ---------
+		//TODO packets are misaligned when reconstructed
 		for (;;){
-			int result = recv(sock,&buffer,recv_buffer_size,0);
+			int result = recv(sock,&recv_buffer,recv_buffer_size,0);
 			if (result < 0){
 				perror("read");
 				fclose(fp);
