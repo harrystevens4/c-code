@@ -16,7 +16,7 @@
 #define SEARCH_PORT "7396"
 #define TRANSFER_PORT "7397"
 #define CHUNK_SIZE 4096
-#define MAX_CONSECUTIVE_PACKETS 0
+#define MAX_CONSECUTIVE_PACKETS 2
 #define PROGRESS_UPDATE_INTERVAL 20
 
 struct advertisement {
