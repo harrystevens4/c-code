@@ -16,7 +16,7 @@
 #define SEARCH_PORT "7396"
 #define TRANSFER_PORT "7397"
 #define CHUNK_SIZE 2048
-#define MAX_CONSECUTIVE_PACKETS 2
+#define MAX_CONSECUTIVE_PACKETS 0
 #define PROGRESS_UPDATE_INTERVAL 20
 
 struct advertisement {
@@ -294,6 +294,7 @@ int send_file(int sock, char *filename){
 				fclose(fp);
 				return 1;
 			}else if (result < transmit_buffer_size){
+				printf("packet of size %d only sent %d bytes\n",transmit_buffer_size,result);
 				transmit_buffer += result;
 				transmit_buffer_size -= result;
 				continue;
@@ -345,11 +346,23 @@ int recv_file(int sock, char *filename){
 		struct file_chunk buffer;
 		memset(&buffer,0,sizeof(struct file_chunk));
 		buffer.done = 1; //safety guard
-		int result = recv(sock,&buffer,sizeof(struct file_chunk),0);
-		if (result < 0){
-			perror("read");
-			fclose(fp);
-			return 1;
+		char *recv_buffer = (char *)&buffer;
+		int recv_buffer_size = sizeof(struct file_chunk);
+		//---------- receive an individual packet ---------
+		for (;;){
+			int result = recv(sock,&buffer,recv_buffer_size,0);
+			if (result < 0){
+				perror("read");
+				fclose(fp);
+				return 1;
+			}if (result < recv_buffer_size){
+				printf("expected %d bytes but got %d\n",recv_buffer_size,result);
+				//receive the rest of the fragmented packet
+				recv_buffer += result;
+				recv_buffer_size -= result;
+			}else{
+				break;
+			}
 		}
 		//printf("buffer {done:%u,data_size:%u,data:%s}\n",buffer.done,buffer.chunk_number,buffer.data_size,buffer.data);
 		if (buffer.done == 1){
@@ -360,7 +373,7 @@ int recv_file(int sock, char *filename){
 			break;
 		}
 		//printf("writing %d bytes\n",buffer.data_size);
-		result = fwrite(buffer.data,1,buffer.data_size,fp);
+		int result = fwrite(buffer.data,1,buffer.data_size,fp);
 		if (result < 0){
 			perror("fwrite");
 			fclose(fp);
