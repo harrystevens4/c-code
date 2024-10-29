@@ -42,22 +42,25 @@ void *advertising_agent(void* args);
 int send_file(int sock, char *filename);
 int recv_file(int sock, char *filename);
 long long int get_filesize(char *filename);
+void render_progress(float percent);
 
 int main(int argc, char **argv){
 	if (argc > 3){
 		print_help();
+		return 1;
 	}
 	if (argc == 2){
-		sender_main(argv[1]);
+		return sender_main(argv[1]);
 	}
 	if (argc == 1){
-		receiver_main();
+		return receiver_main();
 	}
 	//if we are here something has gone wrong
-	return EXIT_FAILURE;
+	return 1;
 }
 void print_help(){
-	printf("Usage: \n");
+	printf("Usage: file-transfer [filename]\n");
+	printf("Not specifying the filename will result in it listening for files.\n");
 }
 int sender_main(char *filename){
 	//================= prep to advertise to network ===================
@@ -110,6 +113,7 @@ int sender_main(char *filename){
 		return 1;
 	}
 	printf("client found.\n");
+	close(server);
 	continue_advertising = 0;
 	pthread_join(agent_thread,NULL);
 	
@@ -151,16 +155,14 @@ int receiver_main(){
 
 	struct advertisement data;
 	//========= listen for available connections ========
-	for (;;){
-		int result = recvfrom(broadcast_fd,&data,sizeof(struct advertisement),0, address_info->ai_addr, &address_info->ai_addrlen);
-		if (result < 0){
-			perror("recvfrom");
-			close(broadcast_fd);
-			return 1;
-		}
-		printf("sender %s found, with file %s. keep listening for another? (y/n)\n",data.hostname,data.filename);
-		if (fgetc(stdin) == 'n') break;
+	result = recvfrom(broadcast_fd,&data,sizeof(struct advertisement),0, address_info->ai_addr, &address_info->ai_addrlen);
+	if (result < 0){
+		perror("recvfrom");
+		close(broadcast_fd);
+		return 1;
 	}
+	printf("Sender %s found, with file %s. Download? (y/n)",data.hostname,data.filename);
+	if (fgetc(stdin) != 'y') return 0;
 	freeaddrinfo(address_info);
 	close(broadcast_fd);
 
@@ -290,6 +292,11 @@ int send_file(int sock, char *filename){
 			fclose(fp);
 			return 1;
 		}
+		if (chunk_number >= PROGRESS_UPDATE_INTERVAL){
+			float progress_percent = (float)ftell(fp)/(float)(filesize);
+			render_progress(progress_percent);
+			chunk_number = 0;
+		}
 		if (packet >= MAX_CONSECUTIVE_PACKETS){
 			struct acknowledgement ack;
 			//printf("waiting for ack...\n");
@@ -303,7 +310,7 @@ int send_file(int sock, char *filename){
 		}
 		packet ++;
 	}
-	printf("transmition over\n");
+	printf("\n");
 	struct file_chunk buffer;
 	buffer.done = 1;
 	int result = write(sock,&buffer,sizeof(struct file_chunk));
@@ -324,12 +331,6 @@ int recv_file(int sock, char *filename){
 	if (fp == NULL){
 		return 1;
 	}
-	struct winsize term_size;
-	int result = ioctl(STDOUT_FILENO, TIOCGWINSZ, &term_size);
-	if (result < 0){
-		perror("ioctl");
-		return 1;
-	}
 	int packet = 0;
 	for (;;){
 		struct file_chunk buffer;
@@ -343,7 +344,6 @@ int recv_file(int sock, char *filename){
 		}
 		//printf("buffer {done:%u,data_size:%u,data:%s}\n",buffer.done,buffer.chunk_number,buffer.data_size,buffer.data);
 		if (buffer.done == 1){
-			printf("transmition over\n");
 			break;
 		}
 		if (buffer.done != 1 && buffer.done != 0){
@@ -362,10 +362,7 @@ int recv_file(int sock, char *filename){
 		if (packet >= PROGRESS_UPDATE_INTERVAL){
 			float progress_percent = (float)ftell(fp)/(float)(buffer.filesize);
 			packet = 0;
-			printf("\r");
-			for (int i = 0; i < progress_percent*term_size.ws_col; i++){
-				putchar('=');
-			}
+			render_progress(progress_percent);
 		}
 		packet++;
 			
@@ -402,4 +399,23 @@ long long int get_filesize(char *filename){
 	}
 	fclose(fp);
 	return size;
+}
+void render_progress(float percent){
+	struct winsize term_size;
+	int result = ioctl(STDOUT_FILENO, TIOCGWINSZ, &term_size);
+	int progress_width = term_size.ws_col-2;
+	if (result < 0){
+		perror("ioctl");
+		return;
+	}
+	printf("\r[");
+	int i;
+	for (i = 0; i < percent*progress_width; i++){
+		putchar('=');
+	}
+	for (; i < term_size.ws_col-2; i++){
+		putchar(' ');
+	}
+	putchar(']');
+	fflush(stdout);
 }
