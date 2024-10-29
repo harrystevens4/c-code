@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <errno.h>
+#include <libgen.h>
 #include <pthread.h>
 #include <string.h>
 #include <netdb.h>
@@ -10,7 +12,7 @@
 
 #define SEARCH_PORT "7396"
 #define TRANSFER_PORT "7397"
-#define CHUNK_SIZE 24
+#define CHUNK_SIZE 512
 
 struct advertisement {
 	char hostname[256];
@@ -18,7 +20,6 @@ struct advertisement {
 };
 struct file_chunk {
 	uint8_t done;
-	uint32_t chunk_number;
 	uint32_t data_size;
 	char data[CHUNK_SIZE];
 };
@@ -53,7 +54,7 @@ int sender_main(char *filename){
 	//start broadcasting agent
 	continue_advertising = 1;
 	pthread_t agent_thread;
-	int result = pthread_create(&agent_thread,NULL,advertising_agent,(void *)filename);
+	int result = pthread_create(&agent_thread,NULL,advertising_agent,(void *)basename(filename));
 	if (result < 0){
 		perror("pthread_create");
 		return 1;
@@ -93,7 +94,12 @@ int sender_main(char *filename){
 	pthread_join(agent_thread,NULL);
 	
 	//====== transfer the file =======
-	send_file(client,filename);
+	result = send_file(client,filename);
+	if (result != 0){
+		printf("couldnt send file.\n");
+		return result;
+	}
+	printf("file sent.\n");
 	close(client);
 
 	return 0;
@@ -159,7 +165,11 @@ int receiver_main(){
 		perror("connect");
 		close(server);
 	}
-	recv_file(server,data.filename);
+	result = recv_file(server,data.filename);
+	if (result != 0){
+		printf("could not get file.\n");
+	}
+	printf("file received.\n");
 	close(server);
 	return 0;
 }
@@ -226,7 +236,6 @@ int send_file(int sock, char *filename){
 	for (int chunk_number = 0;;chunk_number++){
 		struct file_chunk buffer;
 		buffer.done = 0;
-		buffer.chunk_number = chunk_number;
 		if (feof(fp)){
 			break;
 		}
@@ -238,8 +247,10 @@ int send_file(int sock, char *filename){
 		}
 		buffer.data_size = result;
 
-		result = write(sock,&buffer,sizeof(struct file_chunk));
+		result = send(sock,&buffer,sizeof(struct file_chunk),0);
+		printf("sent %d bytes\n",result);
 		if (result < 0){
+			printf("error %d\n",errno);
 			perror("write");
 			fclose(fp);
 			return 1;
@@ -248,6 +259,9 @@ int send_file(int sock, char *filename){
 	struct file_chunk buffer;
 	buffer.done = 1;
 	int result = write(sock,&buffer,sizeof(struct file_chunk));
+	if (result < sizeof(struct file_chunk)){
+		printf("should have written %ld but instead only wrote %d bytes",sizeof(struct file_chunk),result);
+	}
 	if (result < 0){
 		perror("write");
 		fclose(fp);
@@ -264,15 +278,24 @@ int recv_file(int sock, char *filename){
 	}
 	for (;;){
 		struct file_chunk buffer;
-		int result = read(sock,&buffer,sizeof(struct file_chunk));
+		memset(&buffer,0,sizeof(struct file_chunk));
+		buffer.done = 1; //safety guard
+		int result = recv(sock,&buffer,sizeof(struct file_chunk),0);
 		if (result < 0){
 			perror("read");
 			fclose(fp);
 			return 1;
 		}
+		//printf("buffer {done:%u,data_size:%u,data:%s}\n",buffer.done,buffer.chunk_number,buffer.data_size,buffer.data);
 		if (buffer.done == 1){
+			printf("transmition over\n");
 			break;
 		}
+		if (buffer.done != 1 && buffer.done != 0){
+			printf("failure in transmition: buffer.done at %d\n",buffer.done);
+			break;
+		}
+		printf("writing %d bytes\n",buffer.data_size);
 		result = fwrite(buffer.data,1,buffer.data_size,fp);
 		if (result < 0){
 			perror("fwrite");
