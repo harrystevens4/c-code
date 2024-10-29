@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <time.h>
 #include <errno.h>
 #include <libgen.h>
 #include <pthread.h>
@@ -12,7 +13,8 @@
 
 #define SEARCH_PORT "7396"
 #define TRANSFER_PORT "7397"
-#define CHUNK_SIZE 512
+#define CHUNK_SIZE 1024
+#define MAX_CONSECUTIVE_PACKETS 50
 
 struct advertisement {
 	char hostname[256];
@@ -20,8 +22,12 @@ struct advertisement {
 };
 struct file_chunk {
 	uint8_t done;
+	uint8_t ack_required;
 	uint32_t data_size;
 	char data[CHUNK_SIZE];
+};
+struct acknowledgement {
+	uint8_t ready;
 };
 
 volatile int continue_advertising = 0;
@@ -72,6 +78,16 @@ int sender_main(char *filename){
 		return 1;
 	}
 	int server = socket(address_info->ai_family,address_info->ai_socktype,0);
+	if (server < 0){
+		perror("socket");
+		return 1;
+	}
+	int optval = 1;
+	result = setsockopt(server, SOL_SOCKET,SO_REUSEADDR, &optval,sizeof(optval));
+	if (result != 0){
+		perror("setsockopt");
+		return 1;
+	}
 	result = bind(server,address_info->ai_addr,address_info->ai_addrlen);
 	if (result < 0){
 		perror("bind");
@@ -195,7 +211,7 @@ void *advertising_agent(void *args){
 	}
 
 	int optval = 1;
-	result = setsockopt(broadcast_fd, SOL_SOCKET,SO_BROADCAST, &optval,sizeof(optval));
+	result = setsockopt(broadcast_fd, SOL_SOCKET,SO_BROADCAST | SO_REUSEADDR, &optval,sizeof(optval));
 	if (result != 0){
 		perror("setsockopt");
 		return (void *)1;
@@ -233,8 +249,14 @@ int send_file(int sock, char *filename){
 		perror("fopen");
 		return 1;
 	}
+	int packet = 0;
 	for (int chunk_number = 0;;chunk_number++){
 		struct file_chunk buffer;
+		if (packet >= MAX_CONSECUTIVE_PACKETS){
+			buffer.ack_required = 1;
+		}else{
+			buffer.ack_required = 0;
+		}
 		buffer.done = 0;
 		if (feof(fp)){
 			break;
@@ -247,15 +269,30 @@ int send_file(int sock, char *filename){
 		}
 		buffer.data_size = result;
 
+		char *transmit_buffer;
+		int transmit_buffer_size = sizeof(struct file_chunk);
 		result = send(sock,&buffer,sizeof(struct file_chunk),0);
 		printf("sent %d bytes\n",result);
-		if (result < 0){
+		if (result < transmit_buffer_size){
 			printf("error %d\n",errno);
 			perror("write");
 			fclose(fp);
 			return 1;
 		}
+		if (packet >= MAX_CONSECUTIVE_PACKETS){
+			struct acknowledgement ack;
+			printf("waiting for ack...\n");
+			int result = recv(sock,&ack,sizeof(struct acknowledgement),0);
+			if (result < 0){
+				perror("recv");
+				fclose(fp);
+				return 1;
+			}
+			packet = 0;
+		}
+		packet ++;
 	}
+	printf("transmition over\n");
 	struct file_chunk buffer;
 	buffer.done = 1;
 	int result = write(sock,&buffer,sizeof(struct file_chunk));
@@ -301,6 +338,16 @@ int recv_file(int sock, char *filename){
 			perror("fwrite");
 			fclose(fp);
 			return 1;
+		}
+		if (buffer.ack_required == 1){
+			printf("sending ack\n");
+			struct acknowledgement ack;
+			result = send(sock,&ack,sizeof(struct acknowledgement),0);
+			if (result < 0){
+				perror("send");
+				fclose(fp);
+				return 1;
+			}
 		}
 	}
 	fclose(fp);
