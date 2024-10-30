@@ -156,13 +156,23 @@ int receiver_main(){
 
 	struct advertisement data;
 	//========= listen for available connections ========
-	result = recvfrom(broadcast_fd,&data,sizeof(struct advertisement),0, address_info->ai_addr, &address_info->ai_addrlen);
+	struct sockaddr sender_addr;
+	socklen_t sender_addrlen;
+	result = recvfrom(broadcast_fd,&data,sizeof(struct advertisement),0, &sender_addr, &sender_addrlen);
+	char sender_ip[INET6_ADDRSTRLEN+1];
+	struct in_addr sender_in_addr = ((struct sockaddr_in*)&sender_addr)->sin_addr;
+	const char *res = inet_ntop(AF_INET,&sender_in_addr,sender_ip,sizeof(sender_ip));
+	if (res == NULL){
+		return 1;
+		perror("inet_ntop");
+	}
+	
 	if (result < 0){
 		perror("recvfrom");
 		close(broadcast_fd);
 		return 1;
 	}
-	printf("Sender %s found, with file %s. Download? (y/n)",data.hostname,data.filename);
+	printf("Sender %s found at %s, with file %s. Download? (y/n)",data.hostname,sender_ip,data.filename);
 	if (fgetc(stdin) != 'y') return 0;
 	freeaddrinfo(address_info);
 	close(broadcast_fd);
@@ -172,7 +182,7 @@ int receiver_main(){
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 
-	result = getaddrinfo(data.hostname,TRANSFER_PORT,&hints,&address_info);
+	result = getaddrinfo(sender_ip,TRANSFER_PORT,&hints,&address_info);
 	if (result < 0){
 		fprintf(stderr,"getaddrinfo: %s\n",gai_strerror(result));
 		return 1;
