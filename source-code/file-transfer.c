@@ -157,7 +157,7 @@ int receiver_main(){
 	struct advertisement data;
 	//========= listen for available connections ========
 	struct sockaddr sender_addr;
-	socklen_t sender_addrlen;
+	socklen_t sender_addrlen = sizeof(sender_addr);
 	result = recvfrom(broadcast_fd,&data,sizeof(struct advertisement),0, &sender_addr, &sender_addrlen);
 	char sender_ip[INET6_ADDRSTRLEN+1];
 	struct in_addr sender_in_addr = ((struct sockaddr_in*)&sender_addr)->sin_addr;
