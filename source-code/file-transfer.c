@@ -18,6 +18,7 @@
 #define CHUNK_SIZE 8192
 #define MAX_CONSECUTIVE_PACKETS 0
 #define PROGRESS_UPDATE_INTERVAL 20
+#define CLAMP_MIN(x,min) (x > min) ? x : min
 
 struct advertisement {
 	char hostname[256];
@@ -462,7 +463,7 @@ void render_progress(float percent){ //decimal like 0.2
 	}
 	//======= show time remaining =====
 	putchar(']');
-	printf("%*lds",time_remaining_width-3,time_remaining);
+	printf("%*lds",time_remaining_width-3,CLAMP_MIN(time_remaining,0));
 	fflush(stdout);
 	//for next call
 }
