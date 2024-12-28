@@ -1,5 +1,5 @@
 CC=gcc
-LFLAGS=
+LFLAGS=-lX11
 CFLAGS=-g
 foot-pedal-driver : foot-pedal-driver.o
 	$(CC) $^ -o $@ $(LFLAGS)
