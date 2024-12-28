@@ -8,7 +8,11 @@
 int simulate_keypress(char *key, int pressed);
 int get_pedal_state(int pedal_fd);
 int main(int argc, char **argv){
-	char *device = "/dev/ttyACM0";
+	if (argc < 3){
+		fprintf(stderr,"args : <device filename e.g. /dev/ttyACM0> <key to simulate>\n");
+		return 1;
+	}
+	char *device = argv[1];
 	int pedal_fd = open(device,O_RDONLY);
 	if (pedal_fd < 0){
 		perror("open");
@@ -27,7 +31,8 @@ int main(int argc, char **argv){
 		//usleep(100000); //100,000us = 0.1s
 		if (previous_pedal_state != new_pedal_state){
 			printf("%d\n",new_pedal_state);
-			simulate_keypress("Control_L",new_pedal_state);
+			simulate_keypress(argv[2],new_pedal_state);
+			//Control_l, Shift_L and so on
 		}
 		previous_pedal_state = new_pedal_state;
 	}
