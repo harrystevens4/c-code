@@ -19,24 +19,60 @@ int close_tty(int fd);
 int setup_tty(int fd,int baud);
 
 int main(char *argv, int argc){
-	char *filename = "/dev/tty2";
+	int baud = 115200;
+	char *filename = "/dev/ttyUSB0";
+	int return_val = 0;
+
+	//open stdin and stdout in non blocking mode
+	int stdin_fileno = open("/dev/stdin",O_RDONLY | O_NONBLOCK);
+	int stdout_fileno = open("/dev/stdout",O_WRONLY /*| O_NONBLOCK*/);
+	if (stdin_fileno < 0){
+		fprintf(stderr,"Could not open stdin");
+		perror("open");
+		return 1;
+	}
+	if (stdout_fileno < 0){
+		fprintf(stderr,"Could not open stdout");
+		perror("open");
+		return 1;
+	}
+
+	//=========== setup tty ==========
 	int tty_fd = open_tty(filename);
 	if (tty_fd < 0){
 		fprintf(stderr,"Couldnt open terminal device.\n");
 		return 1;
 	}
 	int result = setup_tty(tty_fd,baud);
-
-	//open stdin and stdout in non blocking mode
 	
+	//========= mainloop ==========
 	for (;;){
+		char stdout_buffer[1];
+		char stdin_buffer[1];
 		//read from stdin
+		int result;
 		//write to tty
 
 		//read from tty
+		result = read(tty_fd,stdout_buffer,1);
+		if (result < 0){
+			perror("read");
+			return_val = 1;
+			goto cleanup;
+		}
 		//write to stdout
+		result = write(stdout_fileno,stdout_buffer,1);
+		if (result < 0){
+			perror("write");
+			return_val = 1;
+			goto cleanup;
+		}
 	}
+
+	//========= cleanup ==========
+	cleanup:
 	close_tty(tty_fd);
+	return return_val;
 }
 int open_tty(const char *filename){
 	int tty_fd = open(filename,O_RDWR);
@@ -50,7 +86,7 @@ int close_tty(int fd){
 int setup_tty(int fd,int baud){
 	speed_t speed = get_baud(baud); //lookup table
 	if (speed < 0){
-		fprintf(stderr,"Invalaid baud rate\n")
+		fprintf(stderr,"Invalaid baud rate\n");
 		return -1;
 	}
 
