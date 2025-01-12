@@ -1,4 +1,5 @@
 #include <unistd.h>
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <termios.h>
@@ -17,6 +18,8 @@ int get_baud(int baud);
 int open_tty(const char *filename);
 int close_tty(int fd);
 int setup_tty(int fd,int baud);
+int tty_set_raw(int tty_fd);
+int tty_set_noecho(int tty_fd);
 
 int main(char *argv, int argc){
 	int baud = 115200;
@@ -36,6 +39,16 @@ int main(char *argv, int argc){
 		perror("open");
 		return 1;
 	}
+	//set stdin to unbuffered
+	if (tty_set_raw(stdin_fileno) < 0){
+		fprintf(stderr,"Could not set stdin to unbuffered.\n");
+		return 1;
+	}
+	//NO ECHO
+	if (tty_set_noecho(stdout_fileno) < 0){
+		fprintf(stderr,"Could not set stdin to unbuffered.\n");
+		return 1;
+	}
 
 	//=========== setup tty ==========
 	int tty_fd = open_tty(filename);
@@ -44,29 +57,55 @@ int main(char *argv, int argc){
 		return 1;
 	}
 	int result = setup_tty(tty_fd,baud);
+	//result = tty_set_noecho(tty_fd);
 	
 	//========= mainloop ==========
 	for (;;){
 		char stdout_buffer[1];
 		char stdin_buffer[1];
-		//read from stdin
 		int result;
-		//write to tty
+
+		//read from stdin
+		int stdin_size = read(stdin_fileno,stdin_buffer,sizeof(stdin_buffer));
+		if (stdin_size < 0){
+			if ((errno == EAGAIN) || (errno == EWOULDBLOCK)){
+				//no data available right now
+			}else{
+				perror("read");
+				return_val = 1;
+				goto cleanup;
+			}
+		}else{
+			//write to tty
+			result = write(tty_fd,stdin_buffer,stdin_size);
+			if (result < 0){
+				perror("write");
+				return_val = 1;
+				goto cleanup;
+			}
+		}
 
 		//read from tty
-		result = read(tty_fd,stdout_buffer,1);
-		if (result < 0){
-			perror("read");
-			return_val = 1;
-			goto cleanup;
+		int stdout_size = read(tty_fd,stdout_buffer,sizeof(stdout_buffer));
+		if (stdout_size < 0){
+			if ((errno == EAGAIN) || (errno == EWOULDBLOCK)){
+				//no data available right now
+			}else{
+				perror("read");
+				return_val = 1;
+				goto cleanup;
+			}
+		}else{
+			//write to stdout
+			result = write(stdout_fileno,stdout_buffer,stdout_size);
+			if (result < 0){
+				perror("write");
+				return_val = 1;
+				goto cleanup;
+			}
 		}
-		//write to stdout
-		result = write(stdout_fileno,stdout_buffer,1);
-		if (result < 0){
-			perror("write");
-			return_val = 1;
-			goto cleanup;
-		}
+		//dont spam
+		usleep(1000); //wait 1ms
 	}
 
 	//========= cleanup ==========
@@ -75,7 +114,7 @@ int main(char *argv, int argc){
 	return return_val;
 }
 int open_tty(const char *filename){
-	int tty_fd = open(filename,O_RDWR);
+	int tty_fd = open(filename,O_RDWR | O_NONBLOCK);
 	CHECK_ERR(tty_fd,"open");
 	return tty_fd;
 }
@@ -100,6 +139,28 @@ int setup_tty(int fd,int baud){
 	
 	//apply changes
 	result = tcsetattr(fd,0,&options);
+	CHECK_ERR(result,"tcsetattr");
+}
+int tty_set_raw(int tty_fd){
+	struct termios options;
+	int result = tcgetattr(tty_fd,&options);
+	CHECK_ERR(result,"tcgetattr");
+
+	options.c_lflag &= ~(ICANON); //turn off cannonical mode (no line editing)
+	
+	//apply changes
+	result = tcsetattr(tty_fd,0,&options);
+	CHECK_ERR(result,"tcsetattr");
+}
+int tty_set_noecho(int tty_fd){
+	struct termios options;
+	int result = tcgetattr(tty_fd,&options);
+	CHECK_ERR(result,"tcgetattr");
+
+	options.c_lflag &= ~(ECHO); //turn off echo
+	
+	//apply changes
+	result = tcsetattr(tty_fd,0,&options);
 	CHECK_ERR(result,"tcsetattr");
 }
 int get_baud(int baud) //https://stackoverflow.com/questions/47311500/how-to-efficiently-convert-baudrate-from-int-to-speed-t
