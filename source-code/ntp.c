@@ -1,4 +1,5 @@
 #include <sys/time.h>
+#include <getopt.h>
 #include <errno.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -87,10 +88,65 @@ int get_utc(char *timeserver,struct timeval *tv){
 	freeaddrinfo(address_info);
 	return result;
 }
+static void print_help(){
+	printf("usage:\n");
+	printf("	ntp [options]\n");
+	printf("options:\n");
+	printf("	-h, --help : display this text\n");
+	printf("	-t, --timestamp : print unix timestamp\n");
+	printf("	-c, --ctime : print in ctime format (default)\n");
+	printf("	-f <format string>, --format=<format string> : print with custom format string\n");
+	printf("	-s <timeserver>, --server=<timeserver> : use selected timeserver");
+}
 int main(int argc, char **argv){
+	//defaults
+	char *time_server = "0.uk.pool.ntp.org";
 	struct timeval tv;
-	//if (get_utc("google.com",&tv) < 0) return 1;
-	if (get_utc("0.uk.pool.ntp.org",&tv) < 0) return 1;
-	printf("The time now is %s\n",ctime(&tv.tv_sec));
+	//====== get command line options ======
+	const struct option long_options[] = {
+		{"help",no_argument,0,'h'},
+		{"server",required_argument,0,'s'},
+		{"format",required_argument,0,'f'},
+		{"timestamp",no_argument,0,'t'},
+	};
+	for (;;){
+		int index;
+		int result = getopt_long(argc,argv,"htc:f:s:",long_options,&index);
+		if (result == -1) break;
+
+		//process arguments
+		switch (result){
+			case 'h':
+			print_help();
+			return 0;
+			
+			case 's':
+			time_server = optarg;
+			break;
+
+			case 'f':
+			if (get_utc(time_server,&tv) < 0) return 1;
+			char buffer[1024] = {0}; //probably big enough
+			strftime(buffer,sizeof(buffer),optarg,localtime(&tv.tv_sec));
+			printf("%s\n",buffer);
+			return 0;
+
+			case 't':
+			if (get_utc(time_server,&tv) < 0) return 1;
+			printf("%llu\n",(long long unsigned int)tv.tv_sec);
+			return 0;
+
+			case 'c':
+			break; //ctime is the default option
+			
+			default:
+			print_help();
+			return 1;
+		}
+	}
+	//====== default action ======
+	if (get_utc(time_server,&tv) < 0) return 1;
+	//ctime provides \n
+	printf("%s reports it is now %s",time_server,ctime(&tv.tv_sec));
 	return 0;
 }
