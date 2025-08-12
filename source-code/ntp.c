@@ -100,7 +100,7 @@ static void print_help(){
 }
 int main(int argc, char **argv){
 	//defaults
-	char *time_server = "0.uk.pool.ntp.org";
+	char *time_server = "pool.ntp.org";
 	struct timeval tv;
 	//====== get command line options ======
 	const struct option long_options[] = {
