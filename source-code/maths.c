@@ -10,11 +10,21 @@ double m_sqrt(double val){
 	return guess;
 }
 double m_ln(double val){
-	//====== integral of 1/x between 1 and val ======
+	//===== cant log a negative ======
+	if (val < 0) return -__builtin_inff(); //I ain't including math.h
 	double dx = 0.00001*val;
 	double total = 0;
-	for (double i = 1; i <= val; i += dx){
-		total += (1.0/i) * dx;
+	if (val >= 1){
+	//====== integral of 1/x between 1 and val ======
+		for (double i = 1; i <= val; i += dx){
+			total += (1.0/i) * dx;
+		}
+	}
+	if (val < 1){
+	//====== integral of 1/x between val and 1 ======
+		for (double i = val; i <= 1; i += dx){
+			total -= (1.0/i) * dx;
+		}
 	}
 	return total;
 }
