@@ -11,7 +11,7 @@ double m_sqrt(double val){
 }
 double m_ln(double val){
 	//===== cant log a negative ======
-	if (val < 0) return -__builtin_inff(); //I ain't including math.h
+	if (val < 0) return -INFINITY;
 	double dx = 0.00001*val;
 	double total = 0;
 	if (val >= 1){

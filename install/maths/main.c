@@ -2,6 +2,8 @@
 #include <stdio.h>
 
 int main(int argc,char **argv){
+	printf("INFINITY = %f\n",INFINITY);
+	printf("NAN = %f\n",NAN);
 	printf("ln(0.1) = %f\n",m_ln(0.1));
 	printf("sqrt(2) = %f\n",m_sqrt(2));
 	printf("ln(56) = %f\n",m_ln(56));
