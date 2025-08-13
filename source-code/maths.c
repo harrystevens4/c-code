@@ -2,9 +2,11 @@
 #include <stdio.h>
 
 double m_sqrt(double val){
+	if (val < 0) return NAN;
+	if (val == 0) return 0;
 	double guess = val/2;
 	//====== heron's method ======
-	for (int i = 0; i < 10; i++){
+	for (int i = 0; i < 9; i++){
 		guess = 0.5 * (guess + val/guess);
 	}
 	return guess;
