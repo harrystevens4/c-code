@@ -3,8 +3,7 @@
 
 #include <stdint.h>
 
-const uint64_t INF_BYTES = 0x7f800000;
-#define INFINITY (*((float *)&INF_BYTES))
+#define INFINITY (1.0/0.0)
 #define NAN (0.0f/0.0f)
 
 double m_sqrt(double val);

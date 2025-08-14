@@ -18,7 +18,7 @@ int main(int argc,char **argv){
 	printf("ln(-1) = %f\n",m_ln(-1));
 	printf("sqrt(0) = %f\n",m_sqrt(0));
 	printf("sqrt(-1) = %f\n",m_sqrt(-1));
-	printf("calculating 100,000,000 square roots...\n");
+	printf("calculating 1,000,000,000 square roots...\n");
 	struct timespec start, end;
 	uint64_t square_roots = 1000000000;
 	clock_gettime(CLOCK_REALTIME,&start);
