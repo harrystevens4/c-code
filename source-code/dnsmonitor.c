@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <ifaddrs.h>
 #include <ctype.h>
 #include <sys/stat.h>
 #include <string.h>
@@ -44,6 +45,7 @@ char *bool_to_string(int b);
 
 //======================= definitions ========================
 int main(int argc, char **argv){
+	int return_status = 0;
 	//====== load config files ======
 	struct passwd *pw = getpwuid(getuid());
 	char config_location[2048];
@@ -59,10 +61,43 @@ int main(int argc, char **argv){
 	for (size_t i = 0; i < config.domain_configs_count; i++){
 		printf("(%s) block: %s, redirect: %s\n",config.domain_configs[i].name,bool_to_string(config.domain_configs[i].block),config.domain_configs[i].redirect);
 	}
+	//====== prepare to serve ======
+	//get local ip
+	struct ifaddrs *ifaddrs;
+	result = getifaddrs(&ifaddrs);
+	if (result < 0){
+		PERROR("getifaddrs");
+		free_config(&config);
+		return 1;
+	}
+	struct sockaddr addr;
+	socklen_t addrlen;
+	if (addr.sa_family == AF_INET){
+		addrlen = sizeof(struct sockaddr_in);
+	}else{
+		addrlen = sizeof(struct sockaddr_in6);
+	}
+	memcpy(&addr,ifaddrs->ifa_addr,sizeof(struct sockaddr));
+	freeifaddrs(ifaddrs);
+	//open a socket
+	int sockfd = socket(addr.sa_family,SOCK_DGRAM,0);
+	if (sockfd < 0){
+		PERROR("socket");
+		free_config(&config);
+		return 1;
+	}
+	//bind to local address
+	result = bind(sockfd,&addr,addrlen);
+	if (result != 0){
+		PERROR("bind");
+		goto cleanup;
+	}
 	//====== serve ======
-	
 	//cleanup
+	cleanup:
 	free_config(&config);
+	close(sockfd);
+	return return_status;
 }
 int parse_config(char *file,struct global_config *config){
 	//open
