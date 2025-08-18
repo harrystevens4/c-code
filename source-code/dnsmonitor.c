@@ -1,4 +1,8 @@
 #include <stdio.h>
+#include <net/if.h>
+#include <sys/ioctl.h>
+#include <sys/types.h>
+#include <arpa/inet.h>
 #include <ifaddrs.h>
 #include <ctype.h>
 #include <sys/stat.h>
@@ -13,6 +17,11 @@
 #define PERROR(func) (fprintf(stderr,"[%s:%d] %s: %s\n",__FUNCTION__,__LINE__,func,strerror(errno)))
 
 //======================== structs ========================
+struct dns_question_record {
+	int type;
+	int class;
+	char *name;
+};
 struct domain_config {
 	char *name;
 	int block;
@@ -21,6 +30,15 @@ struct domain_config {
 struct global_config {
 	size_t domain_configs_count;
 	struct domain_config *domain_configs;
+};
+struct __attribute__((packed)) dns_header {
+	uint16_t transaction_id;
+	uint8_t QR_OPCODE_AA_TC_RD;
+	uint8_t RA_Z_AD_CD_RCODE;
+	uint16_t question_count;
+	uint16_t answer_count;
+	uint16_t authority_rr_count;
+	uint16_t additional_rr_count;
 };
 
 //======================== globals ========================
@@ -38,6 +56,7 @@ char **read_file_lines(FILE *file,size_t *line_count);
 size_t split_into(char *input, char ***ret_array, size_t pointer_count, char delim);
 void remove_after(char *line, char delim);
 char *trim_whitespace(char *input);
+long int recvfrom_index(int sockfd, void *buffer, size_t len, size_t offset);
 char *dup_or_null(char *str);
 void free_config(struct global_config *config);
 int string_to_bool(char *str);
@@ -47,15 +66,8 @@ char *bool_to_string(int b);
 int main(int argc, char **argv){
 	int return_status = 0;
 	//====== load config files ======
-	struct passwd *pw = getpwuid(getuid());
-	char config_location[2048];
-	//try the users local config dir
-	snprintf(config_location,sizeof(config_location),"%s/.config/dnsmonitor/dnsmonitor.conf",rtrim(pw->pw_dir,'/'));
-	int result = parse_config(config_location,&config);
-	if (result < 0){
-		//try the global config
-		parse_config("/etc/dnsmonitor/dnsmonitor.conf",&config);
-	}
+	//try the global config
+	parse_config("/etc/dnsmonitor/dnsmonitor.conf",&config);
 	//if no config is loaded a default empty config is used
 	printf("configuration:\n");
 	for (size_t i = 0; i < config.domain_configs_count; i++){
@@ -64,35 +76,99 @@ int main(int argc, char **argv){
 	//====== prepare to serve ======
 	//get local ip
 	struct ifaddrs *ifaddrs;
-	result = getifaddrs(&ifaddrs);
+	int result = getifaddrs(&ifaddrs);
 	if (result < 0){
 		PERROR("getifaddrs");
 		free_config(&config);
 		return 1;
 	}
 	struct sockaddr addr;
-	socklen_t addrlen;
-	if (addr.sa_family == AF_INET){
-		addrlen = sizeof(struct sockaddr_in);
-	}else{
-		addrlen = sizeof(struct sockaddr_in6);
-	}
-	memcpy(&addr,ifaddrs->ifa_addr,sizeof(struct sockaddr));
-	freeifaddrs(ifaddrs);
+	socklen_t addrlen = 0;
 	//open a socket
-	int sockfd = socket(addr.sa_family,SOCK_DGRAM,0);
+	int sockfd = socket(AF_INET,SOCK_DGRAM,0);
 	if (sockfd < 0){
 		PERROR("socket");
 		free_config(&config);
 		return 1;
 	}
-	//bind to local address
-	result = bind(sockfd,&addr,addrlen);
-	if (result != 0){
-		PERROR("bind");
-		goto cleanup;
+	//find address we can bind to
+	for (struct ifaddrs *next = ifaddrs; next != NULL; next = next->ifa_next){
+		int family = next->ifa_addr->sa_family;
+		if (family == AF_INET){
+			memcpy(&addr,next->ifa_addr,sizeof(struct sockaddr));
+			addrlen = sizeof(struct sockaddr_in);
+			//set port
+			((struct sockaddr_in *)&addr)->sin_port = htons(53);
+			//print
+			char addrbuf[INET_ADDRSTRLEN];
+			if (inet_ntop(AF_INET,&((struct sockaddr_in *)&addr)->sin_addr,addrbuf,sizeof(addrbuf)) == NULL){
+				PERROR("inet_ntop");
+				free_config(&config);
+				return 1;
+			}
+			printf("interface: %s, address: %s\n",next->ifa_name,addrbuf);
+			//try to bind
+			result = bind(sockfd,&addr,addrlen);
+			if (result != 0){
+				PERROR("bind");
+				continue;
+			}
+			break;
+		}
 	}
+	if (addrlen == 0){
+		fprintf(stderr,"Could not find non loopback address to bind to");
+		free_config(&config);
+		return 1;
+	}
+	freeifaddrs(ifaddrs);
 	//====== serve ======
+	for (;;){
+		struct sockaddr client_addr;
+		socklen_t client_addrlen = sizeof(struct sockaddr);
+		struct dns_header header;
+		//====== peek at the header ======
+		size_t dns_msg_size = 0;
+		result = recvfrom(sockfd,&header,sizeof(header),MSG_PEEK,&client_addr,&client_addrlen);
+		if (result < 0){
+			PERROR("recvfrom");
+			goto cleanup;
+		}
+		dns_msg_size += sizeof(header);
+		int question_count = ntohs(header.question_count);
+		int answer_count = ntohs(header.answer_count);
+		int authority_rr_count = ntohs(header.authority_rr_count);
+		int additional_rr_count = ntohs(header.additional_rr_count);
+		printf("questions: %d, answers: %d, authority rrs: %d, aditional rrs: %d\n",question_count,answer_count,authority_rr_count,additional_rr_count);
+		//allocate arrays
+		struct dns_question_record *questions = malloc(sizeof(struct dns_question_record *)*question_count);
+		//read questions
+		for (int i = 0; i < question_count; i++){
+			//get the section size
+			uint8_t section_size = 0;
+			result = recvfrom_index(sockfd,&section_size,sizeof(uint8_t),dns_msg_size);
+			if (result < 0){
+				PERROR("recvfrom");
+				goto cleanup;
+			}
+			//fill in details
+			char *buf = malloc(section_size);
+			result = recvfrom_index(sockfd,buf,section_size,dns_msg_size+1);
+			if (result < 0){
+				PERROR("recvfrom");
+				goto cleanup;
+			}
+			short *type = (short *)(buf+section_size-5);
+			short *class = (short *)(buf+section_size-3);
+			questions[i].type = ntohs(*type);
+			questions[i].class = ntohs(*class);
+			questions[i].name = strndup(buf,section_size-4);
+			printf("question: name = %s, type = %d, class = %d\n",questions[i].name,ntohs(*type),ntohs(*class));
+			dns_msg_size += section_size;
+		}
+		for (;question_count > 0; question_count--) free(questions[question_count-1].name);
+		free(questions);
+	}
 	//cleanup
 	cleanup:
 	free_config(&config);
@@ -231,4 +307,12 @@ char *dup_or_null(char *str){
 char *bool_to_string(int b){
 	if (b) return "true";
 	else return "false"; 
+}
+long int recvfrom_index(int sockfd, void *buffer, size_t len, size_t offset){
+	char *datagram = malloc(len+offset);
+	int result = recvfrom(sockfd,datagram,len+offset,MSG_PEEK,NULL,0);
+	if (result < 0) return result;
+	memcpy(buffer,datagram+offset,len);
+	free(datagram);
+	return result;
 }
