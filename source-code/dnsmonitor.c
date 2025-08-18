@@ -17,10 +17,18 @@
 #define PERROR(func) (fprintf(stderr,"[%s:%d] %s: %s\n",__FUNCTION__,__LINE__,func,strerror(errno)))
 
 //======================== structs ========================
-struct dns_question_record {
+struct dns_question {
 	int type;
 	int class;
-	char *name;
+	char **labels;
+	size_t label_count;
+};
+struct dns_request {
+	int question_count;
+	int answer_count;
+	int authority_rr_count;
+	int additional_rr_count;
+	struct dns_question *questions;
 };
 struct domain_config {
 	char *name;
@@ -56,6 +64,9 @@ char **read_file_lines(FILE *file,size_t *line_count);
 size_t split_into(char *input, char ***ret_array, size_t pointer_count, char delim);
 void remove_after(char *line, char delim);
 char *trim_whitespace(char *input);
+int read_labels(int sockfd, char ***labels_p, size_t *label_count_p, size_t offset);
+int read_request(int sockfd, struct dns_request *request);
+void free_request(struct dns_request *request);
 long int recvfrom_index(int sockfd, void *buffer, size_t len, size_t offset);
 char *dup_or_null(char *str);
 void free_config(struct global_config *config);
@@ -104,6 +115,7 @@ int main(int argc, char **argv){
 			if (inet_ntop(AF_INET,&((struct sockaddr_in *)&addr)->sin_addr,addrbuf,sizeof(addrbuf)) == NULL){
 				PERROR("inet_ntop");
 				free_config(&config);
+				close(sockfd);
 				return 1;
 			}
 			printf("interface: %s, address: %s\n",next->ifa_name,addrbuf);
@@ -119,6 +131,7 @@ int main(int argc, char **argv){
 	if (addrlen == 0){
 		fprintf(stderr,"Could not find non loopback address to bind to");
 		free_config(&config);
+		close(sockfd);
 		return 1;
 	}
 	freeifaddrs(ifaddrs);
@@ -128,49 +141,18 @@ int main(int argc, char **argv){
 		socklen_t client_addrlen = sizeof(struct sockaddr);
 		struct dns_header header;
 		//====== peek at the header ======
-		size_t dns_msg_size = 0;
 		result = recvfrom(sockfd,&header,sizeof(header),MSG_PEEK,&client_addr,&client_addrlen);
 		if (result < 0){
 			PERROR("recvfrom");
-			goto cleanup;
+			free_config(&config);
+			close(sockfd);
+			return 1;
 		}
-		dns_msg_size += sizeof(header);
-		int question_count = ntohs(header.question_count);
-		int answer_count = ntohs(header.answer_count);
-		int authority_rr_count = ntohs(header.authority_rr_count);
-		int additional_rr_count = ntohs(header.additional_rr_count);
-		printf("questions: %d, answers: %d, authority rrs: %d, aditional rrs: %d\n",question_count,answer_count,authority_rr_count,additional_rr_count);
-		//allocate arrays
-		struct dns_question_record *questions = malloc(sizeof(struct dns_question_record *)*question_count);
-		//read questions
-		for (int i = 0; i < question_count; i++){
-			//get the section size
-			uint8_t section_size = 0;
-			result = recvfrom_index(sockfd,&section_size,sizeof(uint8_t),dns_msg_size);
-			if (result < 0){
-				PERROR("recvfrom");
-				goto cleanup;
-			}
-			//fill in details
-			char *buf = malloc(section_size);
-			result = recvfrom_index(sockfd,buf,section_size,dns_msg_size+1);
-			if (result < 0){
-				PERROR("recvfrom");
-				goto cleanup;
-			}
-			short *type = (short *)(buf+section_size-5);
-			short *class = (short *)(buf+section_size-3);
-			questions[i].type = ntohs(*type);
-			questions[i].class = ntohs(*class);
-			questions[i].name = strndup(buf,section_size-4);
-			printf("question: name = %s, type = %d, class = %d\n",questions[i].name,ntohs(*type),ntohs(*class));
-			dns_msg_size += section_size;
-		}
-		for (;question_count > 0; question_count--) free(questions[question_count-1].name);
-		free(questions);
+		struct dns_request request;
+		size_t dns_msg_size = read_request(sockfd,&request);
+		break;
 	}
 	//cleanup
-	cleanup:
 	free_config(&config);
 	close(sockfd);
 	return return_status;
@@ -315,4 +297,105 @@ long int recvfrom_index(int sockfd, void *buffer, size_t len, size_t offset){
 	memcpy(buffer,datagram+offset,len);
 	free(datagram);
 	return result;
+}
+int read_request(int sockfd, struct dns_request *request){
+	struct sockaddr client_addr;
+	socklen_t client_addrlen = sizeof(struct sockaddr);
+	struct dns_header header;
+	//====== peek at the header ======
+	size_t dns_msg_size = 0;
+	int result = recvfrom(sockfd,&header,sizeof(header),MSG_PEEK,&client_addr,&client_addrlen);
+	if (result < 0){
+		PERROR("recvfrom");
+		return -1;
+	}
+	dns_msg_size += sizeof(header);
+	request->question_count = ntohs(header.question_count);
+	request->answer_count = ntohs(header.answer_count);
+	request->authority_rr_count = ntohs(header.authority_rr_count);
+	request->additional_rr_count = ntohs(header.additional_rr_count);
+	printf("questions: %d, answers: %d, authority rrs: %d, aditional rrs: %d\n",request->question_count,request->answer_count,request->authority_rr_count,request->additional_rr_count);
+	//====== read questions ======
+	//allocate arrays
+	struct dns_question *questions = malloc(sizeof(struct dns_question *)*request->question_count);
+	request->questions = questions;
+	for (int i = 0; i < request->question_count; i++){
+
+		//read the domain
+		char **labels;
+		size_t label_count;
+		int result = read_labels(sockfd,&labels,&label_count,dns_msg_size);
+		if (result < 0){
+			free_request(request);
+			return -1;
+		};
+		dns_msg_size += result;
+		//read the type and class
+		struct {short a; short b;} ab;
+		result = recvfrom_index(sockfd,&ab,sizeof(ab),dns_msg_size);
+		if (result < 0){
+			PERROR("recvfrom");
+			free_request(request);
+			return -1;
+		}
+		questions[i].type = ntohs(ab.a);
+		questions[i].class = ntohs(ab.b);
+		questions[i].labels = labels;
+		questions[i].label_count = label_count;
+		printf("name = ");
+		for (size_t i = 0; i < label_count; i++){
+			printf("%s",labels[i]);
+			if (i != label_count-1) printf(".");
+		}
+		printf(", type = %d, class = %d\n",questions[i].type,questions[i].class);
+		dns_msg_size += 4;
+	}
+	//====== read answers ======
+	//allocate arrays
+	//struct dns_question *answers = malloc(sizeof(struct dns_question *)*request->question_count);
+	for (int i = 0; i < request->answer_count; i++){
+
+	}
+	return 0;
+}
+void free_request(struct dns_request *request){
+	int question_count = request->question_count;
+	//====== free up data structs ======
+	for (;question_count > 0; question_count--){
+		for (size_t i = 0; i < request->questions[question_count-1].label_count; i++){ 
+			free(request->questions[question_count-1].labels[i]);
+		}
+		free(request->questions[question_count-1].labels);
+	}
+	free(request->questions);
+}
+int read_labels(int sockfd, char ***labels_p, size_t *label_count_p, size_t offset){
+	//fill in details
+	size_t label_count = 0;
+	char **labels = NULL;
+	*labels_p = NULL;
+	size_t size = 0;
+	//read the label
+	for (;;){
+		//get the section size
+		uint8_t section_size = 0;
+		int result = recvfrom_index(sockfd,&section_size,sizeof(uint8_t),offset+size);
+		if (result < 0){
+			PERROR("recvfrom");
+			return -1;
+		}
+		size += 1 + section_size;
+		if (section_size == 0) break;
+		label_count++;
+		labels = realloc(labels,sizeof(char *)*label_count);
+		labels[label_count-1] = calloc(1,section_size+1);
+		result = recvfrom_index(sockfd,labels[label_count-1],section_size,offset+size-section_size);
+		if (result < 0){
+			PERROR("recvfrom");
+			return -1;
+		}
+	}
+	*labels_p = labels;
+	*label_count_p = label_count;
+	return size;
 }
