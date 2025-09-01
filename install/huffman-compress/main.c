@@ -1,0 +1,40 @@
+#include "../../source-code/huffman.h"
+#include <sys/stat.h>
+#include <stdint.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+int main(int argc, char **argv){
+	////====== open the file ======
+	//int input_fd = open(argv[2],O_RDONLY);
+	//if (input_fd != 0){
+	//	perror("open");
+	//	return 1;
+	//}
+	//struct stat statbuf;
+	//int result = fstat(input_fd,&statbuf);
+	//if (result != 0){
+	//	perror("fstat");
+	//	return 1;
+	//}
+	////======= read the file ======
+	//size_t buffer_size = statbuf.st_size;
+	//char *buffer = malloc(buffer_size);
+	//result = read(input_fd,buffer,buffer_size);
+	//if (result != 0){
+	//	perror("read");
+	//	return 1;
+	//}
+	char *buffer = "this is a string";
+	size_t buffer_size = strlen(buffer)+1;
+	char *compressed_data;
+	char *decompressed_data;
+	size_t compressed_size = hfmn_compress(buffer,buffer_size,&compressed_data);
+	size_t decompressed_size = hfmn_decompress(compressed_data,compressed_size,&decompressed_data);
+	printf("%s\n",decompressed_data);
+	free(compressed_data);
+	free(decompressed_data);
+}
