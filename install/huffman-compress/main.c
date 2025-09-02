@@ -6,8 +6,10 @@
 #include <string.h>
 #include <unistd.h>
 #include <fcntl.h>
+#include <limits.h>
 
 int main(int argc, char **argv){
+	printf("%d\n",UCHAR_MAX+1);
 	////====== open the file ======
 	//int input_fd = open(argv[2],O_RDONLY);
 	//if (input_fd != 0){
