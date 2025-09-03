@@ -32,7 +32,10 @@ int extract_bit(char *data,size_t index){
 void print_huffman_tree(struct huffman_tree_node *tree,int depth){
 	static char buffer[1024] = {0};
 	if (tree == NULL) return;
-	if (tree->left == NULL && tree->right == NULL) printf("%c: %s\n",tree->ch,buffer);
+	if (tree->left == NULL && tree->right == NULL){
+		printf("%c: %s\n",tree->ch,buffer);
+		return;
+	}
 	buffer[depth+1] = '\0';
 	buffer[depth] = '0';
 	print_huffman_tree(tree->left,depth+1);
