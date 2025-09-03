@@ -26,8 +26,8 @@ struct huffman_tree_node {
 	struct huffman_tree_node *right;
 	char ch;
 };
-int extract_bit(char *data,size_t index){
-	return data[index/8] >> (7-(index%8));
+int extract_bit(const char *data,size_t index){
+	return (data[index/8] >> (7-(index%8))) & 1;
 }
 void print_huffman_tree(struct huffman_tree_node *tree,int depth){
 	static char buffer[1024] = {0};
@@ -44,7 +44,7 @@ void print_huffman_tree(struct huffman_tree_node *tree,int depth){
 	print_huffman_tree(tree->right,depth+1);
 	buffer[depth+1] = '\0';
 }
-int decode_huffman_data(struct huffman_tree_node *tree,char *data,int byte_offset,char *byte_return){
+int decode_huffman_data(struct huffman_tree_node *tree,const char *data,int byte_offset,char *byte_return){
 	//====== traverse untill leaf node found ======
 	struct huffman_tree_node *current_node = tree;
 	int i = 0;
@@ -52,7 +52,7 @@ int decode_huffman_data(struct huffman_tree_node *tree,char *data,int byte_offse
 		//something has gone wrong
 		if (current_node == NULL) return '\0';
 		//extract the next bit
-		int bit = extract_bit(data,i);
+		int bit = extract_bit(data,i+byte_offset);
 		if (bit) current_node = current_node->right;
 		else current_node = current_node->left;
 		i++;
@@ -65,7 +65,7 @@ static int char_frequency_cmp(const void *a, const void *b){
 	const struct char_frequency *freq_b = b;
 	return freq_b->frequency - freq_a->frequency;
 }
-struct huffman_tree_node *build_huffman_tree(char frequency_table[],int frequency_table_size){
+struct huffman_tree_node *build_huffman_tree(const char frequency_table[],int frequency_table_size){
 	//====== recursively build the tree ======
 	if (frequency_table_size == 1){
 		//====== leaf node ======
@@ -160,7 +160,7 @@ size_t hfmn_compress(const char data[],size_t len,char **output){
 	output_buffer = realloc(output_buffer,header_size+data_size);
 	memcpy(output_buffer+header_size,data_buffer,data_size);
 	((uint8_t *)output_buffer)[0] = frequency_table_size;
-	((uint8_t *)output_buffer)[0] = (byte_offset == 0) ? 8 : byte_offset;
+	((uint8_t *)output_buffer)[1] = (byte_offset == 0) ? 8 : byte_offset;
 	//====== return ======
 	*output = output_buffer;
 	free(data_buffer);
@@ -168,7 +168,7 @@ size_t hfmn_compress(const char data[],size_t len,char **output){
 	return header_size+data_size;
 }
 //TODO: not working
-size_t hfmn_decompress(char data[],size_t len,char **output){
+size_t hfmn_decompress(const char data[],size_t len,char **output){
 	//====== read the frequency table ======
 	int frequency_table_size = ((uint8_t *)data)[0];
 	int final_byte_size = ((uint8_t *)data)[1];
@@ -178,10 +178,13 @@ size_t hfmn_decompress(char data[],size_t len,char **output){
 	size_t decoded_data_size = 0;
 	int byte_offset = 0;
 	size_t data_offset = 0;
+	const char *data_body = data+2+frequency_table_size;
+	size_t data_body_size = len-2-frequency_table_size;
 	for (;decoded_data_size < len-2-frequency_table_size;){
-		if (decoded_data_size >= len-2-frequency_table_size && byte_offset >= final_byte_size) break;
+		if (decoded_data_size >= data_body_size && byte_offset >= final_byte_size) break;
 		char byte = 0;
-		int bits_read = decode_huffman_data(tree,data+2+data_offset,byte_offset,&byte);
+		int bits_read = decode_huffman_data(tree,data_body+data_offset,byte_offset,&byte);
+		printf("%c",byte);
 		byte_offset += bits_read;
 		data_offset += byte_offset/8;
 		byte_offset %= 8;
@@ -189,6 +192,7 @@ size_t hfmn_decompress(char data[],size_t len,char **output){
 		decoded_data = realloc(decoded_data,decoded_data_size);
 		decoded_data[decoded_data_size-1] = byte;
 	}
+	printf("\n");
 	//====== return ======
 	*output = decoded_data; 
 	free_huffman_tree(tree);
