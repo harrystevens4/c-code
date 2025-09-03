@@ -108,7 +108,7 @@ int get_bit_sequence(struct huffman_tree_node *root,char byte,uint8_t *buffer,in
 		return 0;
 	}
 }
-
+//fully tested
 //sets output to a malloc'd pointer
 size_t hfmn_compress(const char data[],size_t len,char **output){
 	//====== count frequencies ======
@@ -167,6 +167,7 @@ size_t hfmn_compress(const char data[],size_t len,char **output){
 	free_huffman_tree(tree);
 	return header_size+data_size;
 }
+//TODO: not working
 size_t hfmn_decompress(char data[],size_t len,char **output){
 	//====== read the frequency table ======
 	int frequency_table_size = ((uint8_t *)data)[0];
