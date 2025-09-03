@@ -1,4 +1,5 @@
 #include "../../source-code/huffman.h"
+#include <assert.h>
 #include <sys/stat.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -9,7 +10,7 @@
 #include <limits.h>
 
 int main(int argc, char **argv){
-	printf("%d\n",UCHAR_MAX+1);
+	//printf("%d\n",UCHAR_MAX+1);
 	////====== open the file ======
 	//int input_fd = open(argv[2],O_RDONLY);
 	//if (input_fd != 0){
@@ -30,12 +31,13 @@ int main(int argc, char **argv){
 	//	perror("read");
 	//	return 1;
 	//}
-	char *buffer = "this is a string";
+	char *buffer = "this is a string and this is more text";
 	size_t buffer_size = strlen(buffer)+1;
 	char *compressed_data;
 	char *decompressed_data;
 	size_t compressed_size = hfmn_compress(buffer,buffer_size,&compressed_data);
 	size_t decompressed_size = hfmn_decompress(compressed_data,compressed_size,&decompressed_data);
+	assert(buffer_size == decompressed_size);
 	printf("%s\n",decompressed_data);
 	free(compressed_data);
 	free(decompressed_data);
