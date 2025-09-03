@@ -39,8 +39,10 @@ void print_huffman_tree(struct huffman_tree_node *tree,int depth){
 	buffer[depth+1] = '\0';
 	buffer[depth] = '0';
 	print_huffman_tree(tree->left,depth+1);
+	buffer[depth+1] = '\0';
 	buffer[depth] = '1';
 	print_huffman_tree(tree->right,depth+1);
+	buffer[depth+1] = '\0';
 }
 int decode_huffman_data(struct huffman_tree_node *tree,char *data,int byte_offset,char *byte_return){
 	//====== traverse untill leaf node found ======
@@ -132,7 +134,7 @@ size_t hfmn_compress(const char data[],size_t len,char **output){
 	char *output_buffer = malloc(header_size);
 	for (int i = 0; i < frequency_table_size; i++) (output_buffer+2)[i] = frequency_table[i].ch;
 	//create huffman tree
-	struct huffman_tree_node *tree = build_huffman_tree(output_buffer,frequency_table_size);
+	struct huffman_tree_node *tree = build_huffman_tree(output_buffer+2,frequency_table_size);
 	print_huffman_tree(tree,0);
 	//====== encode data ======
 	char *data_buffer = NULL;
