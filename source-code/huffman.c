@@ -181,7 +181,7 @@ size_t hfmn_decompress(const char data[],size_t len,char **output){
 	const char *data_body = data+2+frequency_table_size;
 	size_t data_body_size = len-2-frequency_table_size;
 	for (;;){
-		if (data_offset >= data_body_size && byte_offset >= final_byte_size) break;
+		if (data_offset == data_body_size-1 && byte_offset >= final_byte_size) break;
 		char byte = 0;
 		int bits_read = decode_huffman_data(tree,data_body+data_offset,byte_offset,&byte);
 		printf("%c",byte);
