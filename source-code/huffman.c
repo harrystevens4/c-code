@@ -67,6 +67,15 @@ static int char_frequency_cmp(const void *a, const void *b){
 	return freq_b->frequency - freq_a->frequency;
 }
 struct huffman_tree_node *build_huffman_tree(const struct char_frequency frequency_table[],int frequency_table_size){
+	//====== create priority queue with leaf nodes ======
+	//size_t queue_size = frequency_table_size;
+	//for (;queue_size > 1;){
+		//====== remove 2 highest priority nodes ======
+		//====== add them to a new node ======
+		//====== add them back to the queue ======
+	//}
+
+	//TODO: phase out
 	//====== recursively build the tree ======
 	if (frequency_table_size == 1){
 		//====== leaf node ======
