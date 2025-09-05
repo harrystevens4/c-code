@@ -61,40 +61,47 @@ int decode_huffman_data(struct huffman_tree_node *tree,const char *data,int byte
 	*byte_return = current_node->ch;
 	return i;
 }
-static int char_frequency_cmp(const void *a, const void *b){
+int char_frequency_cmp(const void *a, const void *b){
 	const struct char_frequency *freq_a = a;
 	const struct char_frequency *freq_b = b;
 	return freq_b->frequency - freq_a->frequency;
 }
+int huffman_tree_node_cmp(const void *a, const void *b){
+	const struct huffman_tree_node *node_a = *(struct huffman_tree_node **)a;
+	const struct huffman_tree_node *node_b = *(struct huffman_tree_node **)b;
+	return node_a->frequency - node_b->frequency;
+}
 struct huffman_tree_node *build_huffman_tree(const struct char_frequency frequency_table[],int frequency_table_size){
 	//====== create priority queue with leaf nodes ======
-	//size_t queue_size = frequency_table_size;
-	//for (;queue_size > 1;){
-		//====== remove 2 highest priority nodes ======
-		//====== add them to a new node ======
-		//====== add them back to the queue ======
-	//}
-
-	//TODO: phase out
-	//====== recursively build the tree ======
-	if (frequency_table_size == 1){
-		//====== leaf node ======
-		printf("adding root node for %c\n",frequency_table[0].ch);
+	struct huffman_tree_node **queue = malloc(sizeof(struct huffman_tree_node *)*frequency_table_size);
+	int queue_size = frequency_table_size;
+	for (int i = 0; i < frequency_table_size; i++){
 		struct huffman_tree_node *node = malloc(sizeof(struct huffman_tree_node));
 		memset(node,0,sizeof(struct huffman_tree_node));
-		node->ch = frequency_table[0].ch;
-		return node;
-	}else{
-		//====== branch node ======
-		struct huffman_tree_node *node = malloc(sizeof(struct huffman_tree_node));
-		memset(node,0,sizeof(struct huffman_tree_node));
-		//split list down the middle and use each side as each side of the node
-		int midpoint = (frequency_table_size-1)/2;
-		struct huffman_tree_node *left = build_huffman_tree(frequency_table,midpoint+1);
-		struct huffman_tree_node *right = build_huffman_tree(frequency_table+midpoint+1,frequency_table_size-midpoint-1);
-		node->left = left; node->right = right;
-		return node;
+		node->ch = frequency_table[i].ch;
+		node->frequency = frequency_table[i].frequency;
+		queue[i] = node;
 	}
+	for (;queue_size > 1;){
+		//sort in ascending order
+		qsort(queue,queue_size,sizeof(struct huffman_tree_node *),huffman_tree_node_cmp);
+		//====== get 2 highest priority nodes ======
+		struct huffman_tree_node *node_a = queue[0];
+		struct huffman_tree_node *node_b = queue[1];
+		//====== add them to a new node ======
+		struct huffman_tree_node *new_node = malloc(sizeof(struct huffman_tree_node));
+		memset(new_node,0,sizeof(struct huffman_tree_node));
+		new_node->left = node_a;
+		new_node->right = node_b;
+		new_node->frequency = node_a->frequency + node_b->frequency;
+		//====== add them back to the queue and remove node a and b ======
+		queue[0] = new_node;
+		queue[1] = queue[queue_size-1];	
+		queue_size--;
+	}
+	struct huffman_tree_node *root = queue[0];
+	free(queue);
+	return root;
 }
 void free_huffman_tree(struct huffman_tree_node *root){
 	if (root == NULL) return;
