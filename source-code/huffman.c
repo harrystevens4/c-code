@@ -72,6 +72,7 @@ int huffman_tree_node_cmp(const void *a, const void *b){
 	return node_a->frequency - node_b->frequency;
 }
 struct huffman_tree_node *build_huffman_tree(const struct char_frequency frequency_table[],int frequency_table_size){
+	if (frequency_table_size == 0) return NULL;
 	//====== create priority queue with leaf nodes ======
 	struct huffman_tree_node **queue = malloc(sizeof(struct huffman_tree_node *)*frequency_table_size);
 	int queue_size = frequency_table_size;
@@ -177,28 +178,28 @@ size_t hfmn_compress(const char data[],size_t len,char **output){
 	output_buffer = realloc(output_buffer,header_size+data_size);
 	memcpy(output_buffer+header_size,data_buffer,data_size);
 	((uint8_t *)output_buffer)[0] = frequency_table_size;
-	((uint8_t *)output_buffer)[1] = (byte_offset == 0) ? 8 : byte_offset;
+	((uint8_t *)output_buffer)[1] = (byte_offset == 0 && data_size != 0) ? 8 : byte_offset;
 	//====== return ======
 	*output = output_buffer;
 	free(data_buffer);
 	free_huffman_tree(tree);
 	return header_size+data_size;
 }
-//TODO: not working
 size_t hfmn_decompress(const char data[],size_t len,char **output){
+	if (len < 2) return -1;
 	//====== read the frequency table ======
 	int frequency_table_size = ((uint8_t *)data)[0];
 	int final_byte_size = ((uint8_t *)data)[1];
 	struct huffman_tree_node *tree = build_huffman_tree((struct char_frequency *)(data+2),frequency_table_size);
 	//====== decode the raw data ======
-	char *decoded_data;
+	char *decoded_data = NULL;
 	size_t decoded_data_size = 0;
 	int byte_offset = 0;
 	size_t data_offset = 0;
 	const char *data_body = data+2+(sizeof(struct char_frequency)*frequency_table_size);
 	size_t data_body_size = len-2-(sizeof(struct char_frequency)*frequency_table_size);
 	for (;;){
-		if (data_offset == data_body_size-1 && byte_offset >= final_byte_size) break;
+		if (data_offset+1 >= data_body_size && byte_offset >= final_byte_size) break;
 		char byte = 0;
 		int bits_read = decode_huffman_data(tree,data_body+data_offset,byte_offset,&byte);
 		printf("%c",byte);

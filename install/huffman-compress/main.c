@@ -44,4 +44,7 @@ int main(int argc, char **argv){
 	printf("compressed size: %lu\n",compressed_size);
 	free(compressed_data);
 	free(decompressed_data);
+	compressed_size = hfmn_compress(NULL,0,&compressed_data);
+	hfmn_decompress(compressed_data,compressed_size,&decompressed_data);
+	free(compressed_data);
 }
