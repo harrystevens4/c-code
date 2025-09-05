@@ -120,9 +120,9 @@ int get_bit_sequence(struct huffman_tree_node *root,char byte,uint8_t *buffer,in
 	//====== else keep traversing ======
 		int result = 0;
 		buffer[depth] = 0;
-		if (result = get_bit_sequence(root->left,byte,buffer,depth+1)) return result;
+		if ((result = get_bit_sequence(root->left,byte,buffer,depth+1))) return result;
 		buffer[depth] = 1;
-		if (result = get_bit_sequence(root->right,byte,buffer,depth+1)) return result;
+		if ((result = get_bit_sequence(root->right,byte,buffer,depth+1))) return result;
 		return 0;
 	}
 }
@@ -178,7 +178,7 @@ size_t hfmn_compress(const char data[],size_t len,char **output){
 	output_buffer = realloc(output_buffer,header_size+data_size);
 	memcpy(output_buffer+header_size,data_buffer,data_size);
 	((uint8_t *)output_buffer)[0] = frequency_table_size;
-	((uint8_t *)output_buffer)[1] = (byte_offset == 0 && data_size != 0) ? 8 : byte_offset;
+	((uint8_t *)output_buffer)[1] = byte_offset;
 	//====== return ======
 	*output = output_buffer;
 	free(data_buffer);
@@ -189,7 +189,7 @@ size_t hfmn_decompress(const char data[],size_t len,char **output){
 	if (len < 2) return -1;
 	//====== read the frequency table ======
 	int frequency_table_size = ((uint8_t *)data)[0];
-	int final_byte_size = ((uint8_t *)data)[1];
+	int final_byte_offset = ((uint8_t *)data)[1];
 	struct huffman_tree_node *tree = build_huffman_tree((struct char_frequency *)(data+2),frequency_table_size);
 	//====== decode the raw data ======
 	char *decoded_data = NULL;
@@ -199,7 +199,7 @@ size_t hfmn_decompress(const char data[],size_t len,char **output){
 	const char *data_body = data+2+(sizeof(struct char_frequency)*frequency_table_size);
 	size_t data_body_size = len-2-(sizeof(struct char_frequency)*frequency_table_size);
 	for (;;){
-		if (data_offset+1 >= data_body_size && byte_offset >= final_byte_size) break;
+		if (data_offset+1 >= data_body_size && byte_offset >= final_byte_offset) break;
 		char byte = 0;
 		int bits_read = decode_huffman_data(tree,data_body+data_offset,byte_offset,&byte);
 		//printf("%c",byte);
