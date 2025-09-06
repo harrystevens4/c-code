@@ -34,7 +34,7 @@ void print_huffman_tree(struct huffman_tree_node *tree,int depth){
 	static char buffer[1024] = {0};
 	if (tree == NULL) return;
 	if (tree->left == NULL && tree->right == NULL){
-		printf("%c: %s\n",tree->ch,buffer);
+		printf("%x: %s\n",tree->ch,buffer);
 		return;
 	}
 	buffer[depth+1] = '\0';
@@ -134,11 +134,11 @@ size_t hfmn_compress(const char data[],size_t len,char **output){
 	struct char_frequency frequency_table[UCHAR_MAX+1] = {0};
 	for (int i = 0; i < UCHAR_MAX+1; i++) frequency_table[i].ch = i;
 	for (size_t i = 0; i < len; i++){
-		frequency_table[(int)data[i]].frequency++;
+		frequency_table[(unsigned char)data[i]].frequency++;
 	}
 	//sort in prep to build tree
 	qsort(frequency_table,UCHAR_MAX+1,sizeof(struct char_frequency),char_frequency_cmp);
-	//for (int i = 0; i < UCHAR_MAX+1; i++) printf("%c%d",frequency_table[i].ch,frequency_table[i].frequency); printf("\n");
+	for (int i = 0; i < UCHAR_MAX+1; i++) printf("%x %d\n",frequency_table[i].ch,frequency_table[i].frequency);
 	//exclude chars that dont show up
 	int frequency_table_size = UCHAR_MAX+1;
 	for (int i = 0; i < UCHAR_MAX+1; i++){
@@ -153,7 +153,7 @@ size_t hfmn_compress(const char data[],size_t len,char **output){
 	memcpy(output_buffer+2,frequency_table,frequency_table_size*sizeof(struct char_frequency));
 	//create huffman tree
 	struct huffman_tree_node *tree = build_huffman_tree((struct char_frequency *)(output_buffer+2),frequency_table_size);
-	//print_huffman_tree(tree,0);
+	print_huffman_tree(tree,0);
 	//====== encode data ======
 	char *data_buffer = NULL;
 	size_t data_size = 0;
