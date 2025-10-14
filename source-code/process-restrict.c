@@ -43,7 +43,7 @@ static int check_if_allowed(const char *path, char * const* argv, char * const* 
 				errno = EPERM;
 				return -1;
 			}
-			printf("%s == %s\n",strchr(env_var,'=')+1,ld_preload_value);
+			//printf("%s == %s\n",strchr(env_var,'=')+1,ld_preload_value);
 		}
 	}
 	if (!ld_preload_found){
