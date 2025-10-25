@@ -102,3 +102,16 @@ void fb_fill_area(FRAMEBUFFER *fb, size_t x1, size_t y1, size_t x2, size_t y2, u
 		}
 	}
 }
+void fb_draw_rectangle(FRAMEBUFFER *fb, size_t x1, size_t y1, size_t x2, size_t y2, size_t thickness, uint32_t colour){
+	for (size_t y = 0; y < fb->height; y++){
+		for (size_t x = 0; x < fb->width; x++){
+			if (
+				x >= x1 && x <= x2 && y >= y1 && y <= y2 
+				&& !(x >= x1+thickness && y >= y1+thickness
+				&& x <= x2-thickness && y <= y2-thickness)
+			){
+				fb->buffer[y*(fb->width)+x] = colour;
+			}
+		}
+	}
+}

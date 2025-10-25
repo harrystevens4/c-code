@@ -78,7 +78,8 @@ int main(int argc, char **argv){
 		//printf("%ld,%ld\n",mouse_x,mouse_y);
 		//====== render a cursor ======
 		fb_fill(frame_buffer,rgb(0xff,0xff,0xff)); //fill with white
-		fb_fill_area(frame_buffer,mouse_x-10,mouse_y-10,mouse_x+10,mouse_y+10,rgb(66,135,245));
+		fb_draw_rectangle(frame_buffer,mouse_x-10,mouse_y-10,mouse_x+10,mouse_y+10,2,rgb(31,200,88));
+		fb_draw_rectangle(frame_buffer,10,10,100,60,8,rgb(31,200,88));
 		fb_refresh(frame_buffer);
 	}
 	fb_free(frame_buffer);
