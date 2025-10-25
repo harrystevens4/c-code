@@ -1,6 +1,7 @@
 #ifndef _FRAMEBUFFER_H
 #define _FRAMEBUFFER_H
 
+#include <pthread.h>
 #include <stdint.h>
 #include <stddef.h>
 #include <linux/fb.h>
@@ -15,6 +16,7 @@ struct frame_buffer {
 	int fd;
 	size_t width;
 	size_t height;
+	pthread_mutex_t buffer_mutex;
 	uint32_t *buffer; //array of all pixel information stored as rgba with 8 bits for each colour
 	/*treated as struct __attribute__((__packed__)) {
 		uint8_t red;

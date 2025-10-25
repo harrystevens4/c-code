@@ -7,6 +7,7 @@
 #include <string.h>
 #include <fcntl.h>
 #include <sys/ioctl.h>
+#include <pthread.h>
 
 FRAMEBUFFER *fb_new(const char *path){
 	//====== initialise fb struct ======
