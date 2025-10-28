@@ -9,6 +9,9 @@
 #include <sys/ioctl.h>
 #include <pthread.h>
 
+#define MIN(a,b) (((a) < (b)) ? (a) : (b))
+#define MAX(a,b) (((a) > (b)) ? (a) : (b))
+
 FRAMEBUFFER *fb_new(const char *path){
 	//====== initialise fb struct ======
 	FRAMEBUFFER *fb = malloc(sizeof(FRAMEBUFFER));
@@ -113,5 +116,26 @@ void fb_draw_rectangle(FRAMEBUFFER *fb, size_t x1, size_t y1, size_t x2, size_t 
 				fb->buffer[y*(fb->width)+x] = colour;
 			}
 		}
+	}
+}
+void fb_draw_line(FRAMEBUFFER *fb, size_t x1, size_t y1, size_t x2, size_t y2, size_t thickness, uint32_t colour){
+	double m = ((double)y2-(double)y1)/((double)x2-(double)x1);
+	double c = (double)y1-(m*(double)x1);
+	size_t min_x = MAX(MIN(x1,x2),0);
+	size_t max_x = MIN(MAX(x1,x2),fb->width);
+	size_t min_y = MAX(MIN(y1,y2),0);
+	size_t max_y = MIN(MAX(y1,y2),fb->height);
+	for (size_t x = min_x; x < max_x; x++){
+		double y = m*(double)x+c;
+		if (y >= fb->height || y < 0) continue;
+		fb->buffer[(size_t)y*(fb->width)+x] = colour;
+	}
+	for (size_t y = min_y; y < max_y; y++){
+		double x = ((double)(y-c))/m;
+		if (x1 == x2){
+			x = x1;
+		}
+		if (x >= fb->width || x < 0) continue;
+		fb->buffer[y*(fb->width)+(size_t)x] = colour;
 	}
 }

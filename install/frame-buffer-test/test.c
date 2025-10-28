@@ -76,10 +76,13 @@ int main(int argc, char **argv){
 		mouse_x = MAX(MIN(mouse_x+x_movement,(long)w),0);
 		mouse_y = MAX(MIN(mouse_y+y_movement,(long)h),0);
 		//printf("%ld,%ld\n",mouse_x,mouse_y);
+		fb_draw_rectangle(frame_buffer,10,10,100,60,8,rgb(31,200,88));
 		//====== render a cursor ======
 		fb_fill(frame_buffer,rgb(0xff,0xff,0xff)); //fill with white
-		fb_draw_rectangle(frame_buffer,mouse_x-10,mouse_y-10,mouse_x+10,mouse_y+10,2,rgb(31,200,88));
-		fb_draw_rectangle(frame_buffer,10,10,100,60,8,rgb(31,200,88));
+		//fb_draw_rectangle(frame_buffer,mouse_x-10,mouse_y-10,mouse_x+10,mouse_y+10,2,rgb(31,200,88));
+		fb_draw_line(frame_buffer,mouse_x,mouse_y,mouse_x+50,mouse_y,5,rgb(40,40,255));
+		fb_draw_line(frame_buffer,mouse_x,mouse_y,mouse_x,mouse_y+50,5,rgb(40,40,255));
+		fb_draw_line(frame_buffer,mouse_x,mouse_y+50,mouse_x+50,mouse_y,5,rgb(40,40,255));
 		fb_refresh(frame_buffer);
 	}
 	fb_free(frame_buffer);
