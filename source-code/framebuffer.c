@@ -106,8 +106,12 @@ void fb_fill_area(FRAMEBUFFER *fb, size_t x1, size_t y1, size_t x2, size_t y2, u
 	}
 }
 void fb_draw_rectangle(FRAMEBUFFER *fb, size_t x1, size_t y1, size_t x2, size_t y2, size_t thickness, uint32_t colour){
-	for (size_t y = 0; y < fb->height; y++){
-		for (size_t x = 0; x < fb->width; x++){
+	size_t min_x = MIN(MIN(x1,x2),fb->width);
+	size_t min_y = MIN(MIN(y1,y2),fb->height);
+	size_t max_x = MIN(MAX(x1,x2),fb->width);
+	size_t max_y = MIN(MAX(y1,y2),fb->height);
+	for (size_t y = min_y; y < max_y; y++){
+		for (size_t x = min_x; x < max_x; x++){
 			if (
 				x >= x1 && x <= x2 && y >= y1 && y <= y2 
 				&& !(x >= x1+thickness && y >= y1+thickness
@@ -129,6 +133,11 @@ void fb_draw_line(FRAMEBUFFER *fb, size_t x1, size_t y1, size_t x2, size_t y2, s
 		double y = m*(double)x+c;
 		if (y >= fb->height || y < 0) continue;
 		fb->buffer[(size_t)y*(fb->width)+x] = colour;
+		long x1 = MAX((long)x-(long)thickness,0);
+		long y1 = MAX((long)y-(long)thickness,0);
+		long x2 = MIN((long)x+(long)thickness,(long)fb->width);
+		long y2 = MIN((long)y+(long)thickness,(long)fb->height);
+		fb_fill_area(fb,x1,y1,x2,y2,colour);
 	}
 	for (size_t y = min_y; y < max_y; y++){
 		double x = ((double)(y-c))/m;
@@ -137,5 +146,10 @@ void fb_draw_line(FRAMEBUFFER *fb, size_t x1, size_t y1, size_t x2, size_t y2, s
 		}
 		if (x >= fb->width || x < 0) continue;
 		fb->buffer[y*(fb->width)+(size_t)x] = colour;
+		long x1 = MAX((long)x-(long)thickness,0);
+		long y1 = MAX((long)y-(long)thickness,0);
+		long x2 = MIN((long)x+(long)thickness,(long)fb->width);
+		long y2 = MIN((long)y+(long)thickness,(long)fb->height);
+		fb_fill_area(fb,x1,y1,x2,y2,colour);
 	}
 }

@@ -79,7 +79,7 @@ int main(int argc, char **argv){
 		fb_draw_rectangle(frame_buffer,10,10,100,60,8,rgb(31,200,88));
 		//====== render a cursor ======
 		fb_fill(frame_buffer,rgb(0xff,0xff,0xff)); //fill with white
-		//fb_draw_rectangle(frame_buffer,mouse_x-10,mouse_y-10,mouse_x+10,mouse_y+10,2,rgb(31,200,88));
+		fb_draw_rectangle(frame_buffer,0,0,w,h,10,rgb(0,255,1));
 		fb_draw_line(frame_buffer,mouse_x,mouse_y,mouse_x+50,mouse_y,5,rgb(40,40,255));
 		fb_draw_line(frame_buffer,mouse_x,mouse_y,mouse_x,mouse_y+50,5,rgb(40,40,255));
 		fb_draw_line(frame_buffer,mouse_x,mouse_y+50,mouse_x+50,mouse_y,5,rgb(40,40,255));
