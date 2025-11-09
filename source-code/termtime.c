@@ -8,6 +8,8 @@
 #include <locale.h>
 #include <fcntl.h>
 
+char *get_character(char c);
+
 int main(int argc, char **argv){
 	//====== get ncurses set up ======
 	setlocale(LC_ALL,"");
@@ -70,10 +72,8 @@ int main(int argc, char **argv){
 				break;
 			}
 			resizeterm(window_size.ws_row,window_size.ws_col);
-			printw("resize\n");
 		}else if (signal == SIGIO){
 			//keypress
-			printw("input\n");
 			char input = 0;
 			if (read(STDIN_FILENO,&input,1) < 0){
 				perror("read");
@@ -82,7 +82,6 @@ int main(int argc, char **argv){
 			if (input == 'q') break;
 		}else if (signal == SIGALRM){
 			//update the time
-			printw("clock update\n");
 			//schedule update for 1 second later
 			alarm(1);
 		}else if (signal == SIGINT){
@@ -95,5 +94,114 @@ int main(int argc, char **argv){
 	}
 	//====== shut everything down ======
 	endwin();
+	for (int i = 0; i < 10; i++) printf("%s\n",get_character('0'+i));
 	return 0;
+}
+
+//get the ascii font for that specific character
+char *get_character(char c){
+	if (c >= '0' && c <= '9'){
+		return (char *[]){
+			"\
+  <====>\n\
+/\\      /\\\n\
+||      ||\n\
+\\/      \\/\n\
+\n\
+/\\      /\\\n\
+||      ||\n\
+\\/      \\/\n\
+  <====>",
+			"\
+        \n\
+        /\\\n\
+        ||\n\
+        \\/\n\
+        \n\
+        /\\\n\
+        ||\n\
+        \\/\n\
+        ",
+			"\
+  <====>\n\
+        /\\\n\
+        ||\n\
+        \\/\n\
+  <====>\n\
+/\\\n\
+||\n\
+\\/ \n\
+  <====>",
+			"\
+  <====>\n\
+        /\\\n\
+        ||\n\
+        \\/\n\
+  <====>\n\
+        /\\\n\
+        ||\n\
+        \\/\n\
+  <====>",
+			"\
+\n\
+/\\      /\\\n\
+||      ||\n\
+\\/      \\/\n\
+  <====>\n\
+        /\\\n\
+        ||\n\
+        \\/\n\
+",
+			"\
+  <====>\n\
+/\\\n\
+||\n\
+\\/\n\
+  <====>\n\
+        /\\\n\
+        ||\n\
+        \\/\n\
+  <====>",
+			"\
+  <====>\n\
+/\\\n\
+||\n\
+\\/\n\
+  <====>\n\
+/\\      /\\\n\
+||      ||\n\
+\\/      \\/\n\
+  <====>",
+			"\
+  <====>\n\
+        /\\\n\
+        ||\n\
+        \\/\n\
+\n\
+        /\\\n\
+        ||\n\
+        \\/\n\
+",
+			"\
+  <====>\n\
+/\\      /\\\n\
+||      ||\n\
+\\/      \\/\n\
+  <====>\n\
+/\\      /\\\n\
+||      ||\n\
+\\/      \\/\n\
+  <====>",
+			"\
+  <====>\n\
+/\\      /\\\n\
+||      ||\n\
+\\/      \\/\n\
+  <====>\n\
+        /\\\n\
+        ||\n\
+        \\/\n\
+  <====>",
+		}[c-'0'];
+	}else return "";
 }
