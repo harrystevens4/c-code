@@ -15,12 +15,14 @@ int main(int argc, char **argv){
 	noecho();
 	curs_set(0);
 	refresh();
-	//====== block the SIGIO and SIGWINCH signal ======
+	//====== block SIGIO, SIGALRM, SIGINT and SIGWINCH  ======
 	//that way we can be completely signal driven
 	//so we yeild to other processes when nothing is happening
 	sigset_t blocked_signals;
 	sigemptyset(&blocked_signals);
 	sigaddset(&blocked_signals,SIGWINCH);
+	sigaddset(&blocked_signals,SIGALRM);
+	sigaddset(&blocked_signals,SIGINT);
 	sigaddset(&blocked_signals,SIGIO);
 	sigprocmask(SIG_BLOCK,&blocked_signals,NULL);
 	//enable signal drive io on stdin
@@ -52,6 +54,8 @@ int main(int argc, char **argv){
 		perror("tcsetattr");
 		return 1;
 	}
+	//set the first alarm
+	alarm(1);
 	//====== update loop ======
 	for (;;){
 		//====== wait for signal ======
@@ -76,6 +80,14 @@ int main(int argc, char **argv){
 				break;
 			}
 			if (input == 'q') break;
+		}else if (signal == SIGALRM){
+			//update the time
+			printw("clock update\n");
+			//schedule update for 1 second later
+			alarm(1);
+		}else if (signal == SIGINT){
+			//exit
+			break;
 		}
 		//====== redraw the clock ======
 		//erase();
