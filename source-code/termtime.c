@@ -1,4 +1,6 @@
 #include <stdio.h>
+#include <curses.h>
+#include <wchar.h>
 #include <string.h>
 #include <time.h>
 #include <unistd.h>
@@ -10,7 +12,8 @@
 #include <locale.h>
 #include <fcntl.h>
 
-char *get_character_glyph(char c);
+int get_text_width(char *text);
+wchar_t *get_character_glyph(char c);
 int draw_text(int y, int x, char *text);
 
 int main(int argc, char **argv){
@@ -112,6 +115,9 @@ int main(int argc, char **argv){
 			"%H %M %S",
 			time_info
 		);
+		if (timestring_bufferlen == 0){
+			timestring_buffer[0] = '\0';
+		}
 		//centring the text
 		int text_x = (COLS/2)-(get_text_width(timestring_buffer)/2);
 		//        each letter is 9 chars tall
@@ -131,12 +137,14 @@ int get_text_width(char *text){
 	for (char *character = text; *character != '\0'; character++){
 		//convert to glyph
 		size_t max_line_len = 0;
-		char *glyph = get_character_glyph(*character);
+		wchar_t *glyph = get_character_glyph(*character);
 		//for each line in the glyph
-		int current_y = 0;
-		for (char *line = glyph; line-1 != NULL; line = strchr(line,'\n')+1){
-			long line_length = (strchr(line,'\n') != NULL) ? (strchr(line,'\n')-line) : strlen(line);
-			if (line_length > max_line_len) max_line_len = line_length;
+		for (wchar_t *line = glyph;;){
+			long line_length = (wcschr(line,L'\n') != NULL) ? (unsigned long)(wcschr(line,L'\n')-line) : (unsigned long)wcslen(line);
+			if (line_length > (long)max_line_len) max_line_len = line_length;
+			line = wcschr(line,L'\n');
+			if (line == NULL) break;
+			line++;
 		}
 		//move cursor across
 		x += max_line_len + 1;
@@ -146,28 +154,32 @@ int get_text_width(char *text){
 
 int draw_text(int y, int x, char *text){
 	//for each character in the string
-	for (char *character = text; *character != '\0'; character++){
+	for (char *character = text; *character != L'\0'; character++){
 		//convert to glyph
 		size_t max_line_len = 0;
-		char *glyph = get_character_glyph(*character);
+		wchar_t *glyph = get_character_glyph(*character);
 		//for each line in the glyph
 		int current_y = 0;
-		for (char *line = glyph; line-1 != NULL; line = strchr(line,'\n')+1){
-			long line_length = (strchr(line,'\n') != NULL) ? (strchr(line,'\n')-line) : strlen(line);
-			mvaddnstr(y+current_y,x,line,line_length);
-			if (line_length > max_line_len) max_line_len = line_length;
+		for (wchar_t *line = glyph;;){
+			long line_length = (wcschr(line,L'\n') != NULL) ? (unsigned long)(wcschr(line,L'\n')-line) : (unsigned long)wcslen(line);
+			mvaddnwstr(y+current_y,x,line,line_length);
+			if (line_length > (long)max_line_len) max_line_len = line_length;
 			current_y++;
+			line = wcschr(line,L'\n');
+			if (line == NULL) break;
+			line++;
 		}
 		//move cursor across
 		x += max_line_len + 1;
 	}
+	return 0;
 }
 
 //get the ascii font for that specific character
-char *get_character_glyph(char c){
+wchar_t *get_character_glyph(char c){
 	if (c >= '0' && c <= '9'){
-		return (char *[]){
-			"\
+		return (wchar_t *[]){
+			L"\
   <====>\n\
 /\\      /\\\n\
 ||      ||\n\
@@ -177,7 +189,7 @@ char *get_character_glyph(char c){
 ||      ||\n\
 \\/      \\/\n\
   <====>",
-			"\
+			L"\
         \n\
         /\\\n\
         ||\n\
@@ -187,7 +199,7 @@ char *get_character_glyph(char c){
         ||\n\
         \\/\n\
         ",
-			"\
+			L"\
   <====>\n\
         /\\\n\
         ||\n\
@@ -197,7 +209,7 @@ char *get_character_glyph(char c){
 ||\n\
 \\/ \n\
   <====>",
-			"\
+			L"\
   <====>\n\
         /\\\n\
         ||\n\
@@ -207,7 +219,7 @@ char *get_character_glyph(char c){
         ||\n\
         \\/\n\
   <====>",
-			"\
+			L"\
 \n\
 /\\      /\\\n\
 ||      ||\n\
@@ -217,7 +229,7 @@ char *get_character_glyph(char c){
         ||\n\
         \\/\n\
 ",
-			"\
+			L"\
   <====>\n\
 /\\\n\
 ||\n\
@@ -227,7 +239,7 @@ char *get_character_glyph(char c){
         ||\n\
         \\/\n\
   <====>",
-			"\
+			L"\
   <====>\n\
 /\\\n\
 ||\n\
@@ -237,7 +249,7 @@ char *get_character_glyph(char c){
 ||      ||\n\
 \\/      \\/\n\
   <====>",
-			"\
+			L"\
   <====>\n\
         /\\\n\
         ||\n\
@@ -247,7 +259,7 @@ char *get_character_glyph(char c){
         ||\n\
         \\/\n\
 ",
-			"\
+			L"\
   <====>\n\
 /\\      /\\\n\
 ||      ||\n\
@@ -257,7 +269,7 @@ char *get_character_glyph(char c){
 ||      ||\n\
 \\/      \\/\n\
   <====>",
-			"\
+			L"\
   <====>\n\
 /\\      /\\\n\
 ||      ||\n\
@@ -268,5 +280,5 @@ char *get_character_glyph(char c){
         \\/\n\
   <====>",
 		}[c-'0'];
-	}else return "       ";
+	}else return L"       ";
 }
