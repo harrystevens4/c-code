@@ -54,12 +54,13 @@ int main(int argc, char **argv){
 			resizeterm(window_size.ws_row,window_size.ws_col);
 		}else if (signal == SIGIO){
 			//keypress
-			char input = 0;
-			if (read(STDIN_FILENO,&input,1) < 0){
+			char input[1024] = {0}; 
+			//read only one byte and discard the rest
+			if (read(STDIN_FILENO,input,1) < 0){
 				perror("read");
 				break;
 			}
-			if (input == 'q') break;
+			if (*input == 'q') break;
 			//no need to re render the clock
 			continue;
 		}else if (signal == SIGALRM){
