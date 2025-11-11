@@ -12,6 +12,7 @@
 #include <locale.h>
 #include <fcntl.h>
 
+int setup_stdin();
 int get_text_width(char *text);
 wchar_t *get_character_glyph(char c);
 int draw_text(int y, int x, char *text);
@@ -33,35 +34,8 @@ int main(int argc, char **argv){
 	sigaddset(&blocked_signals,SIGINT);
 	sigaddset(&blocked_signals,SIGIO);
 	sigprocmask(SIG_BLOCK,&blocked_signals,NULL);
-	//enable signal drive io on stdin
-	int stdin_flags = fcntl(STDIN_FILENO,F_GETFL);
-	if (stdin_flags < 0){
-		perror("fcntl(F_GETFL)");
-		return 1;
-	}
-	if (fcntl(STDIN_FILENO,F_SETFL,stdin_flags | O_ASYNC) < 0){
-		perror("fcntl(F_SETFL)");
-		return 1;
-	}
-	//the shell probably owns signals from stdin
-	//so we need to steal ownership
-	if (fcntl(STDIN_FILENO,F_SETOWN,getpid()) < 0){
-		perror("fcntl(F_SETOWN)");
-		return 1;
-	}
-	//unbuffer stdin
-	struct termios stdin_settings;
-	if (tcgetattr(STDIN_FILENO,&stdin_settings) < 0){
-		perror("tcgetattr");
-		return 1;
-	}
-	stdin_settings.c_lflag &= ~(ICANON);
-	stdin_settings.c_cc[VMIN] = 0;
-	stdin_settings.c_cc[VTIME] = 0;
-	if (tcsetattr(STDIN_FILENO,TCSANOW,&stdin_settings) < 0){
-		perror("tcsetattr");
-		return 1;
-	}
+	//get stdin ready for us
+	setup_stdin();
 	//start the alarm loop (alarm() cannot create a 0 second alarm)
 	kill(getpid(),SIGALRM);
 	//====== update loop ======
@@ -128,7 +102,40 @@ int main(int argc, char **argv){
 	}
 	//====== shut everything down ======
 	endwin();
-	//for (int i = 0; i < 10; i++) printf("%s\n",get_character('0'+i));
+	return 0;
+}
+
+int setup_stdin(){
+	//====== unbuffer stdin ======
+	struct termios stdin_settings;
+	if (tcgetattr(STDIN_FILENO,&stdin_settings) < 0){
+		perror("tcgetattr");
+		return -1;
+	}
+	stdin_settings.c_lflag &= ~(ICANON);
+	stdin_settings.c_cc[VMIN] = 0;
+	stdin_settings.c_cc[VTIME] = 0;
+	if (tcsetattr(STDIN_FILENO,TCSANOW,&stdin_settings) < 0){
+		perror("tcsetattr");
+		return -1;
+	}
+	//====== enable async mode ======
+	int stdin_flags = fcntl(STDIN_FILENO,F_GETFL);
+	if (stdin_flags < 0){
+		perror("fcntl(F_GETFL)");
+		return -1;
+	}
+	//whenever input becomes available the kernel will send a SIGIO
+	if (fcntl(STDIN_FILENO,F_SETFL,stdin_flags | O_ASYNC) < 0){
+		perror("fcntl(F_SETFL)");
+		return -1;
+	}
+	//the shell probably owns signals from stdin
+	//so we need to steal ownership
+	if (fcntl(STDIN_FILENO,F_SETOWN,getpid()) < 0){
+		perror("fcntl(F_SETOWN)");
+		return -1;
+	}
 	return 0;
 }
 
