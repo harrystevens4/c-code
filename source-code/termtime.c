@@ -112,8 +112,8 @@ int main(int argc, char **argv){
 			"%H %M %S",
 			time_info
 		);
-		//                   each letter is 10 chars wide (with one space at the end)
-		int text_x = (COLS/2)-((timestring_bufferlen*(10+1))/2);
+		//centring the text
+		int text_x = (COLS/2)-(get_text_width(timestring_buffer)/2);
 		//        each letter is 9 chars tall
 		int text_y = (LINES/2) - 9/2;
 		if (text_x < 0) text_x = 0;
@@ -126,21 +126,40 @@ int main(int argc, char **argv){
 	return 0;
 }
 
+int get_text_width(char *text){
+	size_t x = 0;
+	for (char *character = text; *character != '\0'; character++){
+		//convert to glyph
+		size_t max_line_len = 0;
+		char *glyph = get_character_glyph(*character);
+		//for each line in the glyph
+		int current_y = 0;
+		for (char *line = glyph; line-1 != NULL; line = strchr(line,'\n')+1){
+			long line_length = (strchr(line,'\n') != NULL) ? (strchr(line,'\n')-line) : strlen(line);
+			if (line_length > max_line_len) max_line_len = line_length;
+		}
+		//move cursor across
+		x += max_line_len + 1;
+	}
+	return x;
+}
+
 int draw_text(int y, int x, char *text){
-	mvprintw(y,x,"%s",text);
 	//for each character in the string
 	for (char *character = text; *character != '\0'; character++){
 		//convert to glyph
+		size_t max_line_len = 0;
 		char *glyph = get_character_glyph(*character);
 		//for each line in the glyph
 		int current_y = 0;
 		for (char *line = glyph; line-1 != NULL; line = strchr(line,'\n')+1){
 			long line_length = (strchr(line,'\n') != NULL) ? (strchr(line,'\n')-line) : strlen(line);
 			mvaddnstr(y+current_y,x,line,line_length);
+			if (line_length > max_line_len) max_line_len = line_length;
 			current_y++;
 		}
 		//move cursor across
-		x += 11;
+		x += max_line_len + 1;
 	}
 }
 
@@ -249,5 +268,5 @@ char *get_character_glyph(char c){
         \\/\n\
   <====>",
 		}[c-'0'];
-	}else return "";
+	}else return "       ";
 }
