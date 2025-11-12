@@ -1,4 +1,5 @@
 #include <stdio.h>
+#include <getopt.h>
 #include <curses.h>
 #include <wchar.h>
 #include <string.h>
@@ -16,8 +17,29 @@ int setup_stdin();
 int get_text_width(char *text);
 wchar_t *get_character_glyph(char c);
 int draw_text(int y, int x, char *text);
+void print_help(char *name);
 
 int main(int argc, char **argv){
+	char *clock_format_string = "%H:%M:%S";
+	//====== process command line arguments ======
+	struct option long_options[] = {
+		{"help",no_argument,0,'h'},
+		{"format",required_argument,0,'f'},
+	};
+	for (;;){
+		int option_index = 0;
+		int c = getopt_long(argc,argv,"hf:",long_options,&option_index);
+		if (c == -1) break;
+		switch (c){
+		case 'h':
+			print_help(argv[0]);
+			return 0;
+		case 'f':
+			clock_format_string = optarg;
+			break;
+		}
+
+	}
 	//====== get ncurses set up ======
 	setlocale(LC_ALL,"");
 	initscr();
@@ -87,7 +109,7 @@ int main(int argc, char **argv){
 		size_t timestring_bufferlen = strftime(
 			timestring_buffer,
 			sizeof(timestring_buffer),
-			"%H:%M:%S",
+			clock_format_string,
 			time_info
 		);
 		if (timestring_bufferlen == 0){
@@ -104,6 +126,13 @@ int main(int argc, char **argv){
 	//====== shut everything down ======
 	endwin();
 	return 0;
+}
+
+void print_help(char *name){
+	printf("usage: %s [options]\n",name);
+	printf("options:\n");
+	printf("	-h, --help       : print help text\n");
+	printf("	-f, --format <s> : use s as the strftime format string\n");
 }
 
 int setup_stdin(){
