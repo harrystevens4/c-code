@@ -54,7 +54,8 @@ int main(int argc, char **argv){
 	keypad(stdscr,true);
 	refresh();
 	//====== initialise the timer if requested ======
-	if (timer_mode) timer_end_time = prompt_for_timer_length() + time(NULL);
+	time_t timer_length = prompt_for_timer_length();
+	if (timer_mode) timer_end_time = timer_length + time(NULL);
 	//====== block SIGIO, SIGALRM, SIGINT and SIGWINCH  ======
 	//that way we can be completely signal driven
 	//so we yeild to other processes when nothing is happening
@@ -71,6 +72,8 @@ int main(int argc, char **argv){
 	kill(getpid(),SIGALRM);
 	//====== update loop ======
 	for (;;){
+		//====== if a timer is set to 0 just exit immediately ======
+		if (timer_mode && timer_length == 0) break;
 		//====== wait for signal ======
 		int signal = 0;
 		sigwait(&blocked_signals,&signal);
@@ -248,6 +251,8 @@ time_t prompt_for_timer_length(){
 			if (selected_interval == 1) minutes = (minutes > 0) ? minutes-1 : 59;
 			if (selected_interval == 2) seconds = (seconds > 0) ? seconds-1 : 59;
 			break;
+		case 'q':
+			return 0;
 		}
 	}
 }
