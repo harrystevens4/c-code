@@ -103,8 +103,10 @@ int main(int argc, char **argv){
 			break;
 		}
 		//====== get the time ======
-		time_t timestamp = time(NULL);
-		struct tm *time_info = localtime(&timestamp);
+		time_t timestamp = (timer_mode == 0) ? time(NULL) : timer_end_time-time(NULL);
+		struct tm *time_info = (timer_mode == 0) ? localtime(&timestamp) : gmtime(&timestamp);
+		//====== has timer expired? ======
+		if (timer_mode && time(NULL) > timer_end_time) break;
 		//====== redraw the clock ======
 		erase();
 		//terminal too small?
@@ -134,6 +136,7 @@ int main(int argc, char **argv){
 	}
 	//====== shut everything down ======
 	endwin();
+	if (timer_mode) printf("Timer expired.\n");
 	return 0;
 }
 
@@ -223,7 +226,6 @@ time_t prompt_for_timer_length(){
 				mvprintw(y+10,x+(seconds_width/2)-4+hours_width+minutes_width+(time_interval_spacing*2),"\\/ \\/ \\/");
 				break;
 		}
-		mvprintw(0,0,"%d",selected_interval);
 		refresh();
 		//====== await user input ======
 		int input = getch();
