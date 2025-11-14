@@ -136,7 +136,7 @@ int main(int argc, char **argv){
 	}
 	//====== shut everything down ======
 	endwin();
-	if (timer_mode) printf("Timer expired.\n");
+	if (timer_mode && time(NULL) > timer_end_time) printf("Timer expired.\n");
 	return 0;
 }
 
