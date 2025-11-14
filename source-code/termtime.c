@@ -18,17 +18,21 @@ int get_text_width(char *text);
 wchar_t *get_character_glyph(char c);
 int draw_text(int y, int x, char *text);
 void print_help(char *name);
+time_t prompt_for_timer_length();
 
 int main(int argc, char **argv){
 	char *clock_format_string = "%H:%M:%S";
+	int timer_mode = 0;
+	time_t timer_end_time = 0;
 	//====== process command line arguments ======
 	struct option long_options[] = {
 		{"help",no_argument,0,'h'},
 		{"format",required_argument,0,'f'},
+		{"timer",no_argument,0,'t'},
 	};
 	for (;;){
 		int option_index = 0;
-		int c = getopt_long(argc,argv,"hf:",long_options,&option_index);
+		int c = getopt_long(argc,argv,"hf:t",long_options,&option_index);
 		if (c == -1) break;
 		switch (c){
 		case 'h':
@@ -37,6 +41,8 @@ int main(int argc, char **argv){
 		case 'f':
 			clock_format_string = optarg;
 			break;
+		case 't':
+			timer_mode = 1;
 		}
 
 	}
@@ -45,7 +51,10 @@ int main(int argc, char **argv){
 	initscr();
 	noecho();
 	curs_set(0);
+	keypad(stdscr,true);
 	refresh();
+	//====== initialise the timer if requested ======
+	if (timer_mode) timer_end_time = prompt_for_timer_length() + time(NULL);
 	//====== block SIGIO, SIGALRM, SIGINT and SIGWINCH  ======
 	//that way we can be completely signal driven
 	//so we yeild to other processes when nothing is happening
@@ -167,6 +176,78 @@ int setup_stdin(){
 		return -1;
 	}
 	return 0;
+}
+
+time_t prompt_for_timer_length(){
+	time_t seconds = 0;
+	time_t minutes = 0;
+	time_t hours = 0;
+	int selected_interval = 0;
+	const int time_interval_spacing = 6;
+	for (;;){
+		//====== render the currently selected time ======
+		erase();
+		char hours_text[128] = {0};
+		char minutes_text[128] = {0};
+		char seconds_text[128] = {0};
+		snprintf(hours_text,sizeof(hours_text),"%.2lu",hours);
+		snprintf(minutes_text,sizeof(minutes_text),"%.2lu",minutes);
+		snprintf(seconds_text,sizeof(seconds_text),"%.2lu",seconds);
+		size_t hours_width = get_text_width(hours_text);
+		size_t minutes_width = get_text_width(minutes_text);
+		size_t seconds_width = get_text_width(seconds_text);
+		size_t total_width = hours_width + minutes_width + seconds_width + time_interval_spacing*2;
+		//centreing
+		int x = (COLS/2)-(total_width/2);
+		int y = (LINES/2)-5;
+		//the numbers
+		draw_text(y+1,x,hours_text);
+		draw_text(y+1,x+hours_width+time_interval_spacing,minutes_text);
+		draw_text(y+1,x+hours_width+minutes_width+(time_interval_spacing*2),seconds_text);
+		//labels for "hours", "minutes", and "seconds"
+		mvprintw(y-1,x,"Hours");
+		mvprintw(y-1,x+hours_width+time_interval_spacing,"Minutes");
+		mvprintw(y-1,x+hours_width+minutes_width+(time_interval_spacing*2),"Seconds");
+		//====== remder the selected interval indicator ======
+		switch (selected_interval){
+			case 0:
+				mvprintw(y,x+(hours_width/2)-4,"/\\ /\\ /\\");
+				mvprintw(y+10,x+(hours_width/2)-4,"\\/ \\/ \\/");
+				break;
+			case 1:
+				mvprintw(y,x+(minutes_width/2)-4+hours_width+time_interval_spacing,"/\\ /\\ /\\");
+				mvprintw(y+10,x+(minutes_width/2)-4+hours_width+time_interval_spacing,"\\/ \\/ \\/");
+				break;
+			case 2:
+				mvprintw(y,x+(seconds_width/2)-4+hours_width+minutes_width+(time_interval_spacing*2),"/\\ /\\ /\\");
+				mvprintw(y+10,x+(seconds_width/2)-4+hours_width+minutes_width+(time_interval_spacing*2),"\\/ \\/ \\/");
+				break;
+		}
+		mvprintw(0,0,"%d",selected_interval);
+		refresh();
+		//====== await user input ======
+		int input = getch();
+		switch (input){
+		case '\n':
+			return seconds + minutes*60 + hours*3600;
+		case KEY_LEFT:
+			selected_interval = (selected_interval > 0) ? (selected_interval - 1) : 2;
+			break;
+		case KEY_RIGHT:
+			selected_interval = (selected_interval + 1) % 3;
+			break;
+		case KEY_UP:
+			if (selected_interval == 0) hours++;
+			if (selected_interval == 1) minutes = (minutes + 1)%60;
+			if (selected_interval == 2) seconds = (seconds + 1)%60;
+			break;
+		case KEY_DOWN:
+			if (selected_interval == 0) hours = (hours > 0) ? hours-1 : 0;
+			if (selected_interval == 1) minutes = (minutes > 0) ? minutes-1 : 59;
+			if (selected_interval == 2) seconds = (seconds > 0) ? seconds-1 : 59;
+			break;
+		}
+	}
 }
 
 int get_text_width(char *text){
