@@ -54,7 +54,7 @@ int main(int argc, char **argv){
 	keypad(stdscr,true);
 	refresh();
 	//====== initialise the timer if requested ======
-	time_t timer_length = prompt_for_timer_length();
+	time_t timer_length = (timer_mode) ? prompt_for_timer_length() : 0;
 	if (timer_mode) timer_end_time = timer_length + time(NULL);
 	//====== block SIGIO, SIGALRM, SIGINT and SIGWINCH  ======
 	//that way we can be completely signal driven
