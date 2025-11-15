@@ -39,6 +39,13 @@ int main(int argc, char **argv){
 					pow((double)(x-points[i][0]),2) + 
 					pow((double)(y-points[i][1]),2)
 				);
+				//short ciruit (otherwise we end up dividing by 0 later)
+				if (point_distance == 0){
+					if (i == 0) red = UINT8_MAX;
+					if (i == 1) green = UINT8_MAX;
+					if (i == 2) blue = UINT8_MAX;
+					break;
+				}
 				double centre_distance = sqrt(
 					pow((double)((term_width/2)-points[i][0]),2) + 
 					pow((double)((term_height)-points[i][1]),2)
@@ -49,20 +56,22 @@ int main(int argc, char **argv){
 					                /
 					((-2)*radius*point_distance)
 				);
+				double max_perpendicular_distance = cos((M_PI)/point_count)*radius*2;
+				//what proportion of colour?
 				double perpendicular_distance = cos_angle*point_distance;
-				double proportion = (perpendicular_distance/radius);
+				double proportion = (perpendicular_distance/max_perpendicular_distance);
 				if (proportion > 1) proportion = 1;
 				//set the colour
-				if (i == 0) red = UINT8_MAX*proportion;
-				if (i == 1) green = UINT8_MAX*proportion;
-				if (i == 2) blue = UINT8_MAX*proportion;
+				if (i == 0) red = UINT8_MAX-(UINT8_MAX*proportion);
+				if (i == 1) green = UINT8_MAX-(UINT8_MAX*proportion);
+				if (i == 2) blue = UINT8_MAX-(UINT8_MAX*proportion);
 			}
-			for (int i = 0; i < point_count; i++){
-				if (points[i][0] == x && points[i][1] == y){
-					printf("x");
-					goto next_loop;
-				}
-			}
+			//for (int i = 0; i < point_count; i++){
+			//	if (points[i][0] == x && points[i][1] == y){
+			//		printf("#");
+			//		goto next_loop;
+			//	}
+			//}
 			//not reached if a point found here
 			printf("\033[48;2;%u;%u;%um ",red,green,blue);
 			fflush(stdout);
