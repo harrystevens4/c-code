@@ -24,7 +24,10 @@ int main(int argc, char **argv){
 		//                    squish y due to terminal characters being tall
 		points[i][1] = rint( (radius)*cos((2*i*M_PI)/point_count)+(term_height) );
 	}
-	//====== render ======
+	//====== allocate colour grid ======
+	//[ (red,green,blue), ... ]
+	uint8_t *colour_grid = malloc(term_width*term_height*3);
+	//====== generate colour grid ======
 	//        squish y due to terminal characters being tall
 	for (int y = 0; y < term_height*2; y+=2){
 		for (int x = 0; x < term_width; x++){
@@ -62,24 +65,27 @@ int main(int argc, char **argv){
 				double proportion = (perpendicular_distance/max_perpendicular_distance);
 				if (proportion > 1) proportion = 1;
 				//set the colour
-				if (i == 0) red = UINT8_MAX-(UINT8_MAX*proportion);
+				if (i == 0) red   = UINT8_MAX-(UINT8_MAX*proportion);
 				if (i == 1) green = UINT8_MAX-(UINT8_MAX*proportion);
-				if (i == 2) blue = UINT8_MAX-(UINT8_MAX*proportion);
+				if (i == 2) blue  = UINT8_MAX-(UINT8_MAX*proportion);
 			}
-			//for (int i = 0; i < point_count; i++){
-			//	if (points[i][0] == x && points[i][1] == y){
-			//		printf("#");
-			//		goto next_loop;
-			//	}
-			//}
-			//not reached if a point found here
+			colour_grid[(y/2)*term_width*3 + x*3 + 0] = red;
+			colour_grid[(y/2)*term_width*3 + x*3 + 1] = green;
+			colour_grid[(y/2)*term_width*3 + x*3 + 2] = blue;
+		}
+	}
+	for (int y = 0; y < term_height; y++){
+		for (int x = 0; x < term_width; x++){
+			uint8_t red   = colour_grid[y*term_width*3 + x*3 + 0];
+			uint8_t green = colour_grid[y*term_width*3 + x*3 + 1];
+			uint8_t blue  = colour_grid[y*term_width*3 + x*3 + 2];
 			printf("\033[48;2;%u;%u;%um ",red,green,blue);
 			fflush(stdout);
-			next_loop:
 		}
 		if (y < term_height-1) printf("\n");
 	}
 	sleep(5);
+	free(colour_grid);
 }
 
 int get_term_size(int *width, int *height){
