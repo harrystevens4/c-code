@@ -45,7 +45,23 @@ int main(int argc, char **argv){
 	for (;;){
 		int input = get_input();
 		if (input == MOUSE_UP){
-			printf("\r(%d,%d)      ",mouse_position[0],mouse_position[1]);
+			//get mouse position
+			int x = mouse_position[0];
+			int y = mouse_position[1];
+			//clear line
+			printf("\033[2K\r");
+			//set colour to match the one selected
+			int red =   colour_grid.grid[y*term_width + x*3 + 0];
+			int green = colour_grid.grid[y*term_width + x*3 + 1];
+			int blue =  colour_grid.grid[y*term_width + x*3 + 2];
+			printf("\033[48;2;%d;%d;%dm",red,green,blue);
+			//show coordinates
+			printf("(%d,%d)",x,y);
+			//show hex colour value
+			printf(" #%x%x%x",red,green,blue);
+			//continue the line with the normal colour
+			printf("\033[49m");
+			//flush stdout
 			fflush(stdout);
 		}
 	}
@@ -185,6 +201,9 @@ int render_colour_grid(struct colour_grid *colour_grid){
 		}
 		if (y < term_height-1) printf("\n");
 	}
+	//stop colour overspill
+	printf("\033[49m");
+	fflush(stdout);
 	return 0;
 }
 
