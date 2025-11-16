@@ -1,4 +1,7 @@
+#define _GNU_SOURCE
 #include <stdio.h>
+#include <poll.h>
+#include <signal.h>
 #include <string.h>
 #include <stdint.h>
 #include <math.h>
@@ -6,6 +9,8 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 #include <termios.h>
+
+#define MIN(a,b) (((a) < (b)) ? (a) : (b))
 
 struct colour_grid {
 	uint8_t *grid;
@@ -28,6 +33,7 @@ int generate_colour_grid(struct colour_grid *colour_grid);
 void free_colour_grid(struct colour_grid *colour_grid);
 int render_colour_grid(struct colour_grid *colour_grid);
 int get_input(void);
+void empty_sigaction(int sig);
 
 int main(int argc, char **argv){
 	//====== get the terminal size ======
@@ -37,13 +43,47 @@ int main(int argc, char **argv){
 	//====== prep terminal ======
 	init_terminal();
 	atexit(restore_terminal);
+	//====== block sigwinch ======
+	sigset_t blocked_sigset;
+	sigemptyset(&blocked_sigset);
+	sigaddset(&blocked_sigset,SIGWINCH);
+	sigprocmask(SIG_BLOCK,&blocked_sigset,NULL);
+	//allow SIGWINCH to interupt ppoll
+	struct sigaction sigwinch_action = {
+		.sa_handler = empty_sigaction,
+	};
+	sigemptyset(&sigwinch_action.sa_mask);
+	sigaction(SIGWINCH,&sigwinch_action,NULL);
 	//====== generate grid ======
 	struct colour_grid colour_grid;
 	generate_colour_grid(&colour_grid);
 	//====== show it ======
 	render_colour_grid(&colour_grid);
 	for (;;){
+		//====== wait for input ======
+		sigset_t empty_sigset;
+		sigemptyset(&empty_sigset);
+		struct pollfd poll_fds = {
+			.fd = STDIN_FILENO,
+			.events = POLLIN,
+		};
+		int result = ppoll(&poll_fds,1,NULL,&empty_sigset);
+		//system call interupted
+		if (result < 0){
+			//====== probably sigwinch so just rerender ======
+			//regenerate and redisplay grid
+			free_colour_grid(&colour_grid);
+			generate_colour_grid(&colour_grid);
+			get_term_size(&term_width,&term_height);
+			//clear screen and rerender
+			printf("\033[2J\033[49m\r");
+			render_colour_grid(&colour_grid);
+			fflush(stdout);
+			continue;
+		}
+		//====== read input ======
 		int input = get_input();
+		//====== handle inputs ======
 		if (input == MOUSE_UP){
 			//get mouse position
 			int x = mouse_position[0];
@@ -208,6 +248,11 @@ int render_colour_grid(struct colour_grid *colour_grid){
 }
 
 int get_input(void){
+	//term height and such
+	int term_width = 0;	
+	int term_height = 0;
+	if (get_term_size(&term_width,&term_height) < 0) return 1;
+	//read stdin
 	char stdin_buffer[1];
 	if (read(STDIN_FILENO,stdin_buffer,1) < 0) return -1;
 	//"escape" character
@@ -230,9 +275,9 @@ int get_input(void){
 					if (read(STDIN_FILENO,stdin_buffer,1) < 0) return -1;
 					//im not sure why but (0,0) is (33,33)
 					//char is signed but we dont want that
-					mouse_position[0] = (uint8_t)stdin_buffer[0] - 33;
+					mouse_position[0] = MIN((uint8_t)stdin_buffer[0] - 33,term_width);
 					if (read(STDIN_FILENO,stdin_buffer,1) < 0) return -1;
-					mouse_position[1] = (uint8_t)stdin_buffer[0] - 33;
+					mouse_position[1] = MIN((uint8_t)stdin_buffer[0] - 33,term_height);
 					return MOUSE_UP;
 				}
 				break;
@@ -247,4 +292,9 @@ int get_input(void){
 		return stdin_buffer[0];
 	}
 	return -1;
+}
+
+void empty_sigaction(int sig){
+	//suppress unused warnings
+	sig++;
 }
