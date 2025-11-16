@@ -51,9 +51,9 @@ int main(int argc, char **argv){
 			//clear line
 			printf("\033[2K\r");
 			//set colour to match the one selected
-			int red =   colour_grid.grid[y*term_width + x*3 + 0];
-			int green = colour_grid.grid[y*term_width + x*3 + 1];
-			int blue =  colour_grid.grid[y*term_width + x*3 + 2];
+			int red =   colour_grid.grid[y*term_width*3 + x*3 + 0];
+			int green = colour_grid.grid[y*term_width*3 + x*3 + 1];
+			int blue =  colour_grid.grid[y*term_width*3 + x*3 + 2];
 			printf("\033[48;2;%d;%d;%dm",red,green,blue);
 			//show coordinates
 			printf("(%d,%d)",x,y);
