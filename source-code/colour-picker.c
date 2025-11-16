@@ -58,7 +58,7 @@ int main(int argc, char **argv){
 			//show coordinates
 			printf("(%d,%d)",x,y);
 			//show hex colour value
-			printf(" #%x%x%x",red,green,blue);
+			printf(" #%.2x%.2x%.2x",red,green,blue);
 			//continue the line with the normal colour
 			printf("\033[49m");
 			//flush stdout
