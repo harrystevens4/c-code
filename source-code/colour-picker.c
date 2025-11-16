@@ -229,9 +229,10 @@ int get_input(void){
 					//read mouse position
 					if (read(STDIN_FILENO,stdin_buffer,1) < 0) return -1;
 					//im not sure why but (0,0) is (33,33)
-					mouse_position[0] = stdin_buffer[0] - 33;
+					//char is signed but we dont want that
+					mouse_position[0] = (uint8_t)stdin_buffer[0] - 33;
 					if (read(STDIN_FILENO,stdin_buffer,1) < 0) return -1;
-					mouse_position[1] = stdin_buffer[0] - 33;
+					mouse_position[1] = (uint8_t)stdin_buffer[0] - 33;
 					return MOUSE_UP;
 				}
 				break;
