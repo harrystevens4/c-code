@@ -1,13 +1,25 @@
 #include <stdio.h>
+#include <string.h>
 #include <stdint.h>
 #include <math.h>
 #include <stdlib.h>
 #include <unistd.h>
 #include <sys/ioctl.h>
+#include <termios.h>
 
 struct colour_grid {
 	uint8_t *grid;
 };
+
+enum mouse_events {
+	SCROLL_DOWN = UINT8_MAX,
+	SCROLL_UP,
+	MOUSE_UP,
+	MOUSE_DOWN,
+};
+
+struct termios old_term_settings;
+int mouse_position[2];
 
 int get_term_size(int *width, int *height);
 void init_terminal(void);
@@ -15,7 +27,7 @@ void restore_terminal(void);
 int generate_colour_grid(struct colour_grid *colour_grid);
 void free_colour_grid(struct colour_grid *colour_grid);
 int render_colour_grid(struct colour_grid *colour_grid);
-
+int get_input(void);
 
 int main(int argc, char **argv){
 	//====== get the terminal size ======
@@ -30,7 +42,13 @@ int main(int argc, char **argv){
 	generate_colour_grid(&colour_grid);
 	//====== show it ======
 	render_colour_grid(&colour_grid);
-	sleep(4);
+	for (;;){
+		int input = get_input();
+		if (input == MOUSE_UP){
+			printf("\r(%d,%d)      ",mouse_position[0],mouse_position[1]);
+			fflush(stdout);
+		}
+	}
 	//====== cleanup ======
 	free_colour_grid(&colour_grid);
 }
@@ -48,23 +66,38 @@ int get_term_size(int *width, int *height){
 }
 
 void init_terminal(void){
+	//enable raw mode etc.
+	tcgetattr(STDIN_FILENO,&old_term_settings);
+	struct termios new_settings;
+	memcpy(&new_settings,&old_term_settings,sizeof(struct termios));
+	new_settings.c_lflag &= ~(ECHO | ISIG | ICANON);
+	tcsetattr(STDIN_FILENO,TCSANOW,&new_settings);
 	//enable alternative buffer
 	printf("\033[?1049h");
 	//save screen
 	printf("\033[?47h");
+	//enable mouse reporting
+	printf("\033[?1002h");
+	//otherwise these wont take effect untill the next newline
+	fflush(stdout);
 }
 void restore_terminal(void){
+	tcsetattr(STDIN_FILENO,TCSANOW,&old_term_settings);
 	//disable alternative buffer
 	printf("\033[?1049l");
 	//restore screen
 	printf("\033[?47l");
+	//enable mouse reporting
+	printf("\033[?1002l");
+	//otherwise these wont take effect untill the program exits
+	fflush(stdout);
 }
 
 int generate_colour_grid(struct colour_grid *colour_grid){
 	//====== get the terminal size ======
 	int term_width = 0;	
 	int term_height = 0;
-	if (get_term_size(&term_width,&term_height) < 0) return 1;
+	if (get_term_size(&term_width,&term_height) < 0) return -1;
 	//====== find the 3 corners of the triangle ======
 	const int point_count = 3;
 	//radius from the centre to each of the points
@@ -140,7 +173,7 @@ int render_colour_grid(struct colour_grid *colour_grid){
 	//====== get the terminal size ======
 	int term_width = 0;	
 	int term_height = 0;
-	if (get_term_size(&term_width,&term_height) < 0) return 1;
+	if (get_term_size(&term_width,&term_height) < 0) return -1;
 	//====== render each colour from the grid to the terminal ======
 	for (int y = 0; y < term_height-1; y++){
 		for (int x = 0; x < term_width; x++){
@@ -152,4 +185,46 @@ int render_colour_grid(struct colour_grid *colour_grid){
 		}
 		if (y < term_height-1) printf("\n");
 	}
+	return 0;
+}
+
+int get_input(void){
+	char stdin_buffer[1];
+	if (read(STDIN_FILENO,stdin_buffer,1) < 0) return -1;
+	//"escape" character
+	switch (stdin_buffer[0]){
+	case 033:
+		//check for a '[' to see if it is a CSI
+		if (read(STDIN_FILENO,stdin_buffer,1) < 0) return -1;
+		if (stdin_buffer[0] == '['){
+			//what kind of CSI?
+			if (read(STDIN_FILENO,stdin_buffer,1) < 0) return -1;
+			switch (stdin_buffer[0]){
+			case 'M':
+				//====== mouse event ======
+				if (read(STDIN_FILENO,stdin_buffer,1) < 0) return -1;
+				if (stdin_buffer[0] == 97) return SCROLL_DOWN;
+				if (stdin_buffer[0] == 96) return SCROLL_UP;
+				if (stdin_buffer[0] == 32) return MOUSE_DOWN;
+				if (stdin_buffer[0] == 35){
+					//read mouse position
+					if (read(STDIN_FILENO,stdin_buffer,1) < 0) return -1;
+					//im not sure why but (0,0) is (33,33)
+					mouse_position[0] = stdin_buffer[0] - 33;
+					if (read(STDIN_FILENO,stdin_buffer,1) < 0) return -1;
+					mouse_position[1] = stdin_buffer[0] - 33;
+					return MOUSE_UP;
+				}
+				break;
+			}
+		}else {
+			return 033;
+		}
+		break;
+	case 003: //ctrl-c
+		exit(0);
+	default:
+		return stdin_buffer[0];
+	}
+	return -1;
 }
