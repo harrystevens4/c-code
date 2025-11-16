@@ -36,6 +36,7 @@ int main(int argc, char **argv){
 			double green = 0;
 			double blue = 0;
 			for (int i = 0; i < point_count; i++){
+				const double max_perpendicular_distance = cos((M_PI)/point_count)*radius+radius*2;
 				//perpendicular distance to the tangent at point points[i] of circle with radius "radius"
  				//pythagoras
 				double point_distance = sqrt(
@@ -44,10 +45,10 @@ int main(int argc, char **argv){
 				);
 				//short ciruit (otherwise we end up dividing by 0 later)
 				if (point_distance == 0){
-					if (i == 0) red = UINT8_MAX;
-					if (i == 1) green = UINT8_MAX;
-					if (i == 2) blue = UINT8_MAX;
-					break;
+					if (i == 0) red   = max_perpendicular_distance;
+					if (i == 1) green = max_perpendicular_distance;
+					if (i == 2) blue  = max_perpendicular_distance;
+					continue;
 				}
 				double centre_distance = sqrt(
 					pow((double)((term_width/2)-x),2) + 
@@ -59,7 +60,6 @@ int main(int argc, char **argv){
 					                /
 					(-2*radius*point_distance)
 				);
-				double max_perpendicular_distance = cos((M_PI)/point_count)*radius+radius*2;
 				//what proportion of colour?
 				double perpendicular_distance = cos_angle*point_distance;
 				double magic_distance = max_perpendicular_distance-perpendicular_distance;
@@ -86,6 +86,7 @@ int main(int argc, char **argv){
 		if (y < term_height-1) printf("\n");
 	}
 	free(colour_grid);
+	sleep(4);
 }
 
 int get_term_size(int *width, int *height){
