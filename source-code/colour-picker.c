@@ -5,9 +5,62 @@
 #include <unistd.h>
 #include <sys/ioctl.h>
 
+struct colour_grid {
+	uint8_t *grid;
+};
+
 int get_term_size(int *width, int *height);
+void init_terminal(void);
+void restore_terminal(void);
+int generate_colour_grid(struct colour_grid *colour_grid);
+void free_colour_grid(struct colour_grid *colour_grid);
+int render_colour_grid(struct colour_grid *colour_grid);
+
 
 int main(int argc, char **argv){
+	//====== get the terminal size ======
+	int term_width = 0;	
+	int term_height = 0;
+	if (get_term_size(&term_width,&term_height) < 0) return 1;
+	//====== prep terminal ======
+	init_terminal();
+	atexit(restore_terminal);
+	//====== generate grid ======
+	struct colour_grid colour_grid;
+	generate_colour_grid(&colour_grid);
+	//====== show it ======
+	render_colour_grid(&colour_grid);
+	sleep(4);
+	//====== cleanup ======
+	free_colour_grid(&colour_grid);
+}
+
+int get_term_size(int *width, int *height){
+	//ioctl makes for non portable but theres not much I can do
+	struct winsize window_size = {0};
+	if (ioctl(STDOUT_FILENO,TIOCGWINSZ,&window_size) < 0){
+		perror("ioctl(TIOCGWINSZ)");
+		return -1;
+	}
+	*width = window_size.ws_col;
+	*height = window_size.ws_row;
+	return 0;
+}
+
+void init_terminal(void){
+	//enable alternative buffer
+	printf("\033[?1049h");
+	//save screen
+	printf("\033[?47h");
+}
+void restore_terminal(void){
+	//disable alternative buffer
+	printf("\033[?1049l");
+	//restore screen
+	printf("\033[?47l");
+}
+
+int generate_colour_grid(struct colour_grid *colour_grid){
 	//====== get the terminal size ======
 	int term_width = 0;	
 	int term_height = 0;
@@ -26,7 +79,7 @@ int main(int argc, char **argv){
 	}
 	//====== allocate colour grid ======
 	//[ (red,green,blue), ... ]
-	uint8_t *colour_grid = malloc(term_width*term_height*3);
+	colour_grid->grid = malloc(term_width*term_height*3);
 	//====== generate colour grid ======
 	//        squish y due to terminal characters being tall
 	for (int y = 0; y < term_height*2; y+=2){
@@ -69,34 +122,34 @@ int main(int argc, char **argv){
 				if (i == 1) green = magic_distance;//UINT8_MAX-(UINT8_MAX*proportion);
 				if (i == 2) blue  = magic_distance;//UINT8_MAX-(UINT8_MAX*proportion);
 			}
+			//use a proportional value for each component
 			double rgb_total = red + green + blue;
-			colour_grid[(y/2)*term_width*3 + x*3 + 0] = (red   /rgb_total)*UINT8_MAX;
-			colour_grid[(y/2)*term_width*3 + x*3 + 1] = (green /rgb_total)*UINT8_MAX;
-			colour_grid[(y/2)*term_width*3 + x*3 + 2] = (blue  /rgb_total)*UINT8_MAX;
+			colour_grid->grid[(y/2)*term_width*3 + x*3 + 0] = (red   /rgb_total)*UINT8_MAX;
+			colour_grid->grid[(y/2)*term_width*3 + x*3 + 1] = (green /rgb_total)*UINT8_MAX;
+			colour_grid->grid[(y/2)*term_width*3 + x*3 + 2] = (blue  /rgb_total)*UINT8_MAX;
 		}
 	}
+	return 0;
+}
+
+void free_colour_grid(struct colour_grid *grid){
+	free(grid->grid);
+}
+
+int render_colour_grid(struct colour_grid *colour_grid){
+	//====== get the terminal size ======
+	int term_width = 0;	
+	int term_height = 0;
+	if (get_term_size(&term_width,&term_height) < 0) return 1;
+	//====== render each colour from the grid to the terminal ======
 	for (int y = 0; y < term_height-1; y++){
 		for (int x = 0; x < term_width; x++){
-			uint8_t red   = colour_grid[y*term_width*3 + x*3 + 0];
-			uint8_t green = colour_grid[y*term_width*3 + x*3 + 1];
-			uint8_t blue  = colour_grid[y*term_width*3 + x*3 + 2];
+			uint8_t red   = colour_grid->grid[y*term_width*3 + x*3 + 0];
+			uint8_t green = colour_grid->grid[y*term_width*3 + x*3 + 1];
+			uint8_t blue  = colour_grid->grid[y*term_width*3 + x*3 + 2];
 			printf("\033[48;2;%u;%u;%um ",red,green,blue);
 			fflush(stdout);
 		}
 		if (y < term_height-1) printf("\n");
 	}
-	free(colour_grid);
-	sleep(4);
-}
-
-int get_term_size(int *width, int *height){
-	//ioctl makes for non portable but theres not much I can do
-	struct winsize window_size = {0};
-	if (ioctl(STDOUT_FILENO,TIOCGWINSZ,&window_size) < 0){
-		perror("ioctl(TIOCGWINSZ)");
-		return -1;
-	}
-	*width = window_size.ws_col;
-	*height = window_size.ws_row;
-	return 0;
 }
