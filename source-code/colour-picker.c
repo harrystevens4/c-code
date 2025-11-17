@@ -91,18 +91,20 @@ int main(int argc, char **argv){
 			//cleanly exit
 			goto main_cleanup;
 		case SIGWINCH:
+			//try to maintain coordinates
+			int old_width = term_width;
+			int old_height = term_height;
+			get_term_size(&term_width,&term_height);
+			x = ((double)x/(double)old_width)*term_width;
+			y = ((double)y/(double)old_height)*term_height;
 			//====== rerender screen ======
 			//regenerate and redisplay grid
 			free_colour_grid(&colour_grid);
 			generate_colour_grid(&colour_grid);
-			get_term_size(&term_width,&term_height);
 			//clear screen and rerender
 			printf("\033[2J\033[49m\r");
 			render_colour_grid(&colour_grid);
 			fflush(stdout);
-			//reset coordinates
-			x = term_width/2;
-			y = term_height/2;
 			break;
 		case SIGIO:
 			for (;;){
