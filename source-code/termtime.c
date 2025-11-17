@@ -29,6 +29,7 @@ int main(int argc, char **argv){
 		{"help",no_argument,0,'h'},
 		{"format",required_argument,0,'f'},
 		{"timer",no_argument,0,'t'},
+		{0,0,0,0},
 	};
 	for (;;){
 		int option_index = 0;
