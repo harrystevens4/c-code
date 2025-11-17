@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include <getopt.h>
 #include <fcntl.h>
 #include <stdio.h>
 #include <poll.h>
@@ -35,9 +36,24 @@ int generate_colour_grid(struct colour_grid *colour_grid);
 void free_colour_grid(struct colour_grid *colour_grid);
 int render_colour_grid(struct colour_grid *colour_grid);
 int get_input(void);
-void empty_sigaction(int sig);
+void print_help(char *program_name);
 
 int main(int argc, char **argv){
+	//====== process command line ======
+	struct option options[] = {
+		{"help",no_argument,0,'h'},
+		{0,0,0,0},
+	};
+	for (;;){
+		int option_index = 0;
+		int option = getopt_long(argc,argv,"h",options,&option_index);
+		if (option == -1) break;
+		switch (option){
+		case 'h':
+			print_help(argv[0]);
+			return 0;
+		}
+	}
 	//====== get the terminal size ======
 	int term_width = 0;	
 	int term_height = 0;
@@ -326,7 +342,14 @@ int get_input(void){
 	return -1;
 }
 
-void empty_sigaction(int sig){
-	//suppress unused warnings
-	sig++;
+void print_help(char *program_name){
+	printf("Usage: %s [options]\n",program_name);
+	printf("Options:\n");
+	printf("	-h, --help : show help text\n");
+	printf("Controls:\n");
+	printf("	This program is entirely mouse based (ironic for a terminal application)\n");
+	printf("	Click on a colour to select it\n");
+	printf("	Scroll up and down to change brightness\n");
+	printf("	Ctrl-c to quit\n");
+	printf("	The bottom status bar shows the coordinates, hex colour and brightness\n");
 }
