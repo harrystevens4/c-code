@@ -12,6 +12,7 @@
 #include <termios.h>
 
 #define MIN(a,b) (((a) < (b)) ? (a) : (b))
+#define MAX(a,b) (((a) > (b)) ? (a) : (b))
 
 struct colour_grid {
 	uint8_t *grid;
@@ -57,8 +58,28 @@ int main(int argc, char **argv){
 	//====== show it ======
 	render_colour_grid(&colour_grid);
 	//====== mainloop ======
+	int brightness = 0;
+	int x = term_width/2, y = term_height/2;
 	//completely signal driven
 	for (;;){
+		//====== display the status bar ======
+		//clear line
+		printf("\033[2K\r");
+		//set colour to match the one selected
+		int red =   MAX(MIN(colour_grid.grid[y*term_width*3 + x*3 + 0]+brightness,0xff),0);
+		int green = MAX(MIN(colour_grid.grid[y*term_width*3 + x*3 + 1]+brightness,0xff),0);
+		int blue =  MAX(MIN(colour_grid.grid[y*term_width*3 + x*3 + 2]+brightness,0xff),0);
+		printf("\033[48;2;%d;%d;%dm",red,green,blue);
+		//show coordinates
+		printf("(%d,%d)",x,y);
+		//show hex colour value
+		printf(" #%.2x%.2x%.2x",red,green,blue);
+		//show brightness
+		printf(" | brightness %+d",brightness);
+		//continue the line with the normal colour
+		printf("\033[49m");
+		//flush stdout
+		fflush(stdout);
 		//====== wait for signal ======
 		int signal;
 		if (sigwait(&blocked_sigset,&signal) < 0){
@@ -79,6 +100,9 @@ int main(int argc, char **argv){
 			printf("\033[2J\033[49m\r");
 			render_colour_grid(&colour_grid);
 			fflush(stdout);
+			//reset coordinates
+			x = term_width/2;
+			y = term_height/2;
 			break;
 		case SIGIO:
 			for (;;){
@@ -88,23 +112,18 @@ int main(int argc, char **argv){
 				//====== handle inputs ======
 				if (input == MOUSE_UP){
 					//get mouse position
-					int x = mouse_position[0];
-					int y = mouse_position[1];
-					//clear line
-					printf("\033[2K\r");
-					//set colour to match the one selected
-					int red =   colour_grid.grid[y*term_width*3 + x*3 + 0];
-					int green = colour_grid.grid[y*term_width*3 + x*3 + 1];
-					int blue =  colour_grid.grid[y*term_width*3 + x*3 + 2];
-					printf("\033[48;2;%d;%d;%dm",red,green,blue);
-					//show coordinates
-					printf("(%d,%d)",x,y);
-					//show hex colour value
-					printf(" #%.2x%.2x%.2x",red,green,blue);
-					//continue the line with the normal colour
-					printf("\033[49m");
-					//flush stdout
-					fflush(stdout);
+					x = mouse_position[0];
+					y = mouse_position[1];
+				}
+				if (input == SCROLL_DOWN){
+					brightness = MAX(brightness-2,-0xff);
+					//snap to 0
+					if (brightness == -1 || brightness == 1) brightness = 0;
+				}
+				if (input == SCROLL_UP){
+					brightness = MIN(brightness+2,0xff);
+					//snap to 0
+					if (brightness == -1 || brightness == 1) brightness = 0;
 				}
 			}
 			break;
