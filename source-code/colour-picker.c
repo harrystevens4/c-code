@@ -1,4 +1,5 @@
 #define _GNU_SOURCE
+#include <fcntl.h>
 #include <stdio.h>
 #include <poll.h>
 #include <signal.h>
@@ -43,34 +44,33 @@ int main(int argc, char **argv){
 	//====== prep terminal ======
 	init_terminal();
 	atexit(restore_terminal);
-	//====== block sigwinch ======
+	//====== block signals ======
 	sigset_t blocked_sigset;
 	sigemptyset(&blocked_sigset);
 	sigaddset(&blocked_sigset,SIGWINCH);
+	sigaddset(&blocked_sigset,SIGINT);
+	sigaddset(&blocked_sigset,SIGIO);
 	sigprocmask(SIG_BLOCK,&blocked_sigset,NULL);
-	//allow SIGWINCH to interupt ppoll
-	struct sigaction sigwinch_action = {
-		.sa_handler = empty_sigaction,
-	};
-	sigemptyset(&sigwinch_action.sa_mask);
-	sigaction(SIGWINCH,&sigwinch_action,NULL);
 	//====== generate grid ======
 	struct colour_grid colour_grid;
 	generate_colour_grid(&colour_grid);
 	//====== show it ======
 	render_colour_grid(&colour_grid);
+	//====== mainloop ======
+	//completely signal driven
 	for (;;){
-		//====== wait for input ======
-		sigset_t empty_sigset;
-		sigemptyset(&empty_sigset);
-		struct pollfd poll_fds = {
-			.fd = STDIN_FILENO,
-			.events = POLLIN,
-		};
-		int result = ppoll(&poll_fds,1,NULL,&empty_sigset);
-		//system call interupted
-		if (result < 0){
-			//====== probably sigwinch so just rerender ======
+		//====== wait for signal ======
+		int signal;
+		if (sigwait(&blocked_sigset,&signal) < 0){
+			perror("sigwait");
+			break;
+		}
+		switch (signal){
+		case SIGINT:
+			//cleanly exit
+			goto main_cleanup;
+		case SIGWINCH:
+			//====== rerender screen ======
 			//regenerate and redisplay grid
 			free_colour_grid(&colour_grid);
 			generate_colour_grid(&colour_grid);
@@ -79,33 +79,39 @@ int main(int argc, char **argv){
 			printf("\033[2J\033[49m\r");
 			render_colour_grid(&colour_grid);
 			fflush(stdout);
-			continue;
-		}
-		//====== read input ======
-		int input = get_input();
-		//====== handle inputs ======
-		if (input == MOUSE_UP){
-			//get mouse position
-			int x = mouse_position[0];
-			int y = mouse_position[1];
-			//clear line
-			printf("\033[2K\r");
-			//set colour to match the one selected
-			int red =   colour_grid.grid[y*term_width*3 + x*3 + 0];
-			int green = colour_grid.grid[y*term_width*3 + x*3 + 1];
-			int blue =  colour_grid.grid[y*term_width*3 + x*3 + 2];
-			printf("\033[48;2;%d;%d;%dm",red,green,blue);
-			//show coordinates
-			printf("(%d,%d)",x,y);
-			//show hex colour value
-			printf(" #%.2x%.2x%.2x",red,green,blue);
-			//continue the line with the normal colour
-			printf("\033[49m");
-			//flush stdout
-			fflush(stdout);
+			break;
+		case SIGIO:
+			for (;;){
+				//====== read input ======
+				int input = get_input();
+				if (input < 0) break;
+				//====== handle inputs ======
+				if (input == MOUSE_UP){
+					//get mouse position
+					int x = mouse_position[0];
+					int y = mouse_position[1];
+					//clear line
+					printf("\033[2K\r");
+					//set colour to match the one selected
+					int red =   colour_grid.grid[y*term_width*3 + x*3 + 0];
+					int green = colour_grid.grid[y*term_width*3 + x*3 + 1];
+					int blue =  colour_grid.grid[y*term_width*3 + x*3 + 2];
+					printf("\033[48;2;%d;%d;%dm",red,green,blue);
+					//show coordinates
+					printf("(%d,%d)",x,y);
+					//show hex colour value
+					printf(" #%.2x%.2x%.2x",red,green,blue);
+					//continue the line with the normal colour
+					printf("\033[49m");
+					//flush stdout
+					fflush(stdout);
+				}
+			}
+			break;
 		}
 	}
 	//====== cleanup ======
+	main_cleanup:
 	free_colour_grid(&colour_grid);
 }
 
@@ -126,7 +132,7 @@ void init_terminal(void){
 	tcgetattr(STDIN_FILENO,&old_term_settings);
 	struct termios new_settings;
 	memcpy(&new_settings,&old_term_settings,sizeof(struct termios));
-	new_settings.c_lflag &= ~(ECHO | ISIG | ICANON);
+	new_settings.c_lflag &= ~(ECHO | ICANON);
 	tcsetattr(STDIN_FILENO,TCSANOW,&new_settings);
 	//enable alternative buffer
 	printf("\033[?1049h");
@@ -136,6 +142,11 @@ void init_terminal(void){
 	printf("\033[?1002h");
 	//otherwise these wont take effect untill the next newline
 	fflush(stdout);
+	//turn on nonblocking mode on stdin
+	int flags = fcntl(STDIN_FILENO,F_GETFL);
+	fcntl(STDIN_FILENO,F_SETFL,flags | O_NONBLOCK | O_ASYNC);
+	//take ownership of stdin signals
+	fcntl(STDIN_FILENO,F_SETOWN,getpid());
 }
 void restore_terminal(void){
 	tcsetattr(STDIN_FILENO,TCSANOW,&old_term_settings);
@@ -248,6 +259,8 @@ int render_colour_grid(struct colour_grid *colour_grid){
 }
 
 int get_input(void){
+	//wait 1ms for input to show up
+	usleep(1000);
 	//term height and such
 	int term_width = 0;	
 	int term_height = 0;
@@ -286,8 +299,6 @@ int get_input(void){
 			return 033;
 		}
 		break;
-	case 003: //ctrl-c
-		exit(0);
 	default:
 		return stdin_buffer[0];
 	}
