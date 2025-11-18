@@ -128,20 +128,25 @@ int main(int argc, char **argv){
 				int input = get_input();
 				if (input < 0) break;
 				//====== handle inputs ======
-				if (input == MOUSE_UP){
+				switch (input){
+				case MOUSE_UP:
 					//get mouse position
 					x = mouse_position[0];
 					y = mouse_position[1];
-				}
-				if (input == SCROLL_DOWN){
+					break;
+				case SCROLL_DOWN:
 					brightness = MAX(brightness-2,-0xff);
 					//snap to 0
 					if (brightness == -1 || brightness == 1) brightness = 0;
-				}
-				if (input == SCROLL_UP){
+					break;
+				case SCROLL_UP:
 					brightness = MIN(brightness+2,0xff);
 					//snap to 0
 					if (brightness == -1 || brightness == 1) brightness = 0;
+					break;
+				case 'q':
+					//quit
+					goto main_cleanup;
 				}
 			}
 			break;
