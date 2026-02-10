@@ -8,8 +8,8 @@
 #define INITIAL_HEAP_SIZE 1024
 
 struct chunk_header {
-	void *next;
-	void *prev;
+	struct chunk_header *next;
+	struct chunk_header *prev;
 	uint64_t checksum;
 	uint64_t chunk_size; //usable data (not including the header)
 	uint8_t is_free; //0 = allocated 1 = free
@@ -44,6 +44,26 @@ int split_chunk(void *chunk_start, size_t first_half_size){
 	//update the old chunk
 	header->chunk_size = first_half_size;
 	header->next = new_chunk_header;
+	if (header->next != NULL){
+		header->next->prev = new_chunk_header;
+	}
+	return 0;
+}
+
+int merge_chunk_with_next(void *chunk_start){
+	if (chunk_start == NULL) return -1;
+	struct chunk_header *this_chunk = chunk_start;
+	struct chunk_header *next_chunk = this_chunk->next;
+	//both chunks must be free to merge
+	if (!this_chunk->is_free || !next_chunk->is_free) return -1;
+	//nothing to merge too
+	if (this_chunk->next == NULL) return 0;
+	//merge
+	this_chunk->chunk_size += sizeof(struct chunk_header) + next_chunk->chunk_size;
+	this_chunk->next = next_chunk->next;
+	if (next_chunk->next != NULL){
+		next_chunk->next->prev = this_chunk;
+	}
 	return 0;
 }
 
@@ -89,4 +109,9 @@ void *mha_alloc(size_t size){
 void mha_free(void *ptr){
 	if (!initialised) init();
 	if (!initialised) return; //initialisation failed
+	struct chunk_header *chunk = ptr - sizeof(struct chunk_header);
+	chunk->is_free = 1;
+	//attempt to merge
+	merge_chunk_with_next(chunk);
+	merge_chunk_with_next(chunk->prev);
 }
