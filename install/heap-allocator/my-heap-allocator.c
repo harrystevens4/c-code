@@ -37,10 +37,11 @@ int split_chunk(void *chunk_start, size_t first_half_size){
 	size_t old_chunk_size = header->chunk_size;
 	struct chunk_header *new_chunk_header = chunk_start + sizeof(struct chunk_header) + first_half_size;
 	memset(new_chunk_header,0,sizeof(struct chunk_header));
-	new_chunk_header->chunk_size = old_chunk_size - sizeof(struct chunk_header);
+	new_chunk_header->chunk_size = old_chunk_size - sizeof(struct chunk_header) - first_half_size;
 	new_chunk_header->prev = chunk_start;
 	new_chunk_header->next = header->next;
-	new_chunk_header->is_free = header->is_free;
+	new_chunk_header->is_free = 1;
+	header->is_free = 0;
 	//update the old chunk
 	header->chunk_size = first_half_size;
 	header->next = new_chunk_header;
@@ -55,7 +56,7 @@ int merge_chunk_with_next(void *chunk_start){
 	struct chunk_header *this_chunk = chunk_start;
 	struct chunk_header *next_chunk = this_chunk->next;
 	//both chunks must be free to merge
-	if (!this_chunk->is_free || !next_chunk->is_free) return -1;
+	if (!this_chunk->is_free || next_chunk == NULL || !next_chunk->is_free) return -1;
 	//nothing to merge too
 	if (this_chunk->next == NULL) return 0;
 	//merge
@@ -87,6 +88,7 @@ void init(){
 	first_chunk_header->checksum = calculate_chunk_checksum(first_chunk_header);
 	//====== cleanup ======
 	printf("heap initialised\n");
+	printf("sizeof(chunk_header) = %lu\n",sizeof(struct chunk_header));
 	initialised = 1;
 }
 
@@ -99,19 +101,32 @@ void *mha_alloc(size_t size){
 		if (chunk->is_free == 1){
 			//attempt to partition it
 			int result = split_chunk(chunk,size);
+			chunk->is_free = 0;
 			//not enough space
 			if (result < 0) continue;
-			else return chunk;
+			else return (void *)chunk + sizeof(struct chunk_header);
 		}
 	}
 	return NULL;
 }
+
 void mha_free(void *ptr){
 	if (!initialised) init();
 	if (!initialised) return; //initialisation failed
+	if (ptr == NULL) return; //ignore
 	struct chunk_header *chunk = ptr - sizeof(struct chunk_header);
 	chunk->is_free = 1;
 	//attempt to merge
 	merge_chunk_with_next(chunk);
 	merge_chunk_with_next(chunk->prev);
+}
+
+void print_heap_state(){
+	printf("+------------+\n");
+	for (struct chunk_header *chunk = heap_info.heap_start; chunk != NULL; chunk = chunk->next){
+		char *chunk_status[] = {"in use","free"};
+		printf("|%-12s|\n",chunk_status[chunk->is_free]);
+		printf("|%-12lu|\n",chunk->chunk_size);
+		printf("+------------+\n");
+	}
 }
