@@ -6,6 +6,8 @@
 #include <string.h>
 #include <pthread.h>
 
+//whenever I refer to chunk_start as a parameter, it is a pointer to chunk_header, not the first byte of the usable chunk
+
 #define INITIAL_HEAP_SIZE 1024
 
 struct chunk_header {
@@ -68,6 +70,23 @@ int merge_chunk_with_next(void *chunk_start){
 		next_chunk->next->prev = this_chunk;
 	}
 	return 0;
+}
+
+int extend_heap(void *chunk_start, size_t target_chunk_size){
+	struct chunk_header *chunk;
+	void *allocation_start = chunk_start+sizeof(struct chunk_header)+chunk->chunk_size;
+	void *allocation = mmap(
+		allocation_start,
+		target_chunk_size-chunk->chunk_size,
+		PROT_READ | PROT_WRITE,MAP_ANONYMOUS,
+		-1,
+		0
+	);
+	if (allocation == NULL) return -1;
+	//check memory has been mapped as asked
+	if (allocation != allocation_start){
+		return -1;
+	}
 }
 
 void init(){
