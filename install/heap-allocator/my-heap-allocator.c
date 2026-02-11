@@ -4,6 +4,7 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <string.h>
+#include <pthread.h>
 
 #define INITIAL_HEAP_SIZE 1024
 
@@ -20,6 +21,7 @@ static int initialised = 0;
 struct {
 	void *heap_start;
 	size_t heap_size;
+	pthread_mutex_t heap_lock;
 } heap_info;
 
 uint64_t calculate_chunk_checksum(void *chunk_start){ //where the header is put
@@ -69,8 +71,10 @@ int merge_chunk_with_next(void *chunk_start){
 }
 
 void init(){
-	//====== mmap a small heap to start with ======
+	//====== initialise structures ======
 	memset(&heap_info,0,sizeof(heap_info));
+	pthread_mutex_init(&heap_info.heap_lock,NULL);
+	//====== mmap a small heap to start with ======
 	void *heap_start = mmap(NULL,INITIAL_HEAP_SIZE,PROT_READ | PROT_WRITE,MAP_PRIVATE | MAP_ANONYMOUS,-1,0);
 	heap_info.heap_start = heap_start;
 	heap_info.heap_size = INITIAL_HEAP_SIZE;
@@ -95,6 +99,8 @@ void init(){
 void *mha_alloc(size_t size){
 	if (!initialised) init();
 	if (!initialised) return NULL; //initialisation failed
+	//lock heap
+	pthread_mutex_lock(&heap_info.heap_lock);
 	//traverse chunks
 	for (struct chunk_header *chunk = heap_info.heap_start; chunk != NULL; chunk = chunk->next){
 		//chunk is free?
@@ -104,9 +110,15 @@ void *mha_alloc(size_t size){
 			chunk->is_free = 0;
 			//not enough space
 			if (result < 0) continue;
-			else return (void *)chunk + sizeof(struct chunk_header);
+			else {
+				//unlock heap
+				pthread_mutex_unlock(&heap_info.heap_lock);
+				return (void *)chunk + sizeof(struct chunk_header);
+			}
 		}
 	}
+	//unlock heap
+	pthread_mutex_unlock(&heap_info.heap_lock);
 	return NULL;
 }
 
@@ -114,11 +126,16 @@ void mha_free(void *ptr){
 	if (!initialised) init();
 	if (!initialised) return; //initialisation failed
 	if (ptr == NULL) return; //ignore
+	//gain control of heap
+	pthread_mutex_lock(&heap_info.heap_lock);
+	//====== mark as free ======
 	struct chunk_header *chunk = ptr - sizeof(struct chunk_header);
 	chunk->is_free = 1;
-	//attempt to merge
+	//====== attempt to merge surrounding chunks ======
 	merge_chunk_with_next(chunk);
 	merge_chunk_with_next(chunk->prev);
+	//relinquish heap
+	pthread_mutex_unlock(&heap_info.heap_lock);
 }
 
 void print_heap_state(){
