@@ -157,6 +157,24 @@ void mha_free(void *ptr){
 	pthread_mutex_unlock(&heap_info.heap_lock);
 }
 
+void *mha_realloc(void *ptr, size_t new_size){
+	//TODO
+	if (ptr == NULL) return mha_alloc(new_size);
+	//====== check chunk ======
+	struct chunk_header *chunk = ptr - sizeof(struct chunk_header);
+	size_t old_size = chunk->chunk_size;
+	//its not realy plausable to move the next chunk back to take up the space so simply ignore the request
+	if (new_size <= old_size) return ptr; 
+	//====== is there enough free space to resize in place? ======
+	if (chunk->next != NULL && chunk->next->chunk_size >= new_size - old_size){
+		//TODO
+		merge_chunk_with_next(chunk);
+	}else {
+		//====== alloc a new chunk and move the data there ======
+		//TODO
+	}
+}
+
 void print_heap_state(){
 	printf("+------------+\n");
 	for (struct chunk_header *chunk = heap_info.heap_start; chunk != NULL; chunk = chunk->next){
