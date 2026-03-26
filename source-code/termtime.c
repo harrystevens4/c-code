@@ -148,6 +148,7 @@ void print_help(char *name){
 	printf("usage: %s [options]\n",name);
 	printf("options:\n");
 	printf("	-h, --help       : print help text\n");
+	printf("	-t, --timer       : start as a timer\n");
 	printf("	-f, --format <s> : use s as the strftime format string\n");
 }
 
