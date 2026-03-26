@@ -4,6 +4,9 @@
 #include <unistd.h>
 #include <sys/mman.h>
 #include <string.h>
+#include <pthread.h>
+
+//whenever I refer to chunk_start as a parameter, it is a pointer to chunk_header, not the first byte of the usable chunk
 
 #define INITIAL_HEAP_SIZE 1024
 
@@ -20,6 +23,7 @@ static int initialised = 0;
 struct {
 	void *heap_start;
 	size_t heap_size;
+	pthread_mutex_t heap_lock;
 } heap_info;
 
 uint64_t calculate_chunk_checksum(void *chunk_start){ //where the header is put
@@ -37,10 +41,11 @@ int split_chunk(void *chunk_start, size_t first_half_size){
 	size_t old_chunk_size = header->chunk_size;
 	struct chunk_header *new_chunk_header = chunk_start + sizeof(struct chunk_header) + first_half_size;
 	memset(new_chunk_header,0,sizeof(struct chunk_header));
-	new_chunk_header->chunk_size = old_chunk_size - sizeof(struct chunk_header);
+	new_chunk_header->chunk_size = old_chunk_size - sizeof(struct chunk_header) - first_half_size;
 	new_chunk_header->prev = chunk_start;
 	new_chunk_header->next = header->next;
-	new_chunk_header->is_free = header->is_free;
+	new_chunk_header->is_free = 1;
+	header->is_free = 0;
 	//update the old chunk
 	header->chunk_size = first_half_size;
 	header->next = new_chunk_header;
@@ -55,7 +60,7 @@ int merge_chunk_with_next(void *chunk_start){
 	struct chunk_header *this_chunk = chunk_start;
 	struct chunk_header *next_chunk = this_chunk->next;
 	//both chunks must be free to merge
-	if (!this_chunk->is_free || !next_chunk->is_free) return -1;
+	if (!this_chunk->is_free || next_chunk == NULL || !next_chunk->is_free) return -1;
 	//nothing to merge too
 	if (this_chunk->next == NULL) return 0;
 	//merge
@@ -67,9 +72,28 @@ int merge_chunk_with_next(void *chunk_start){
 	return 0;
 }
 
+int extend_heap(void *chunk_start, size_t target_chunk_size){
+	struct chunk_header *chunk;
+	void *allocation_start = chunk_start+sizeof(struct chunk_header)+chunk->chunk_size;
+	void *allocation = mmap(
+		allocation_start,
+		target_chunk_size-chunk->chunk_size,
+		PROT_READ | PROT_WRITE,MAP_ANONYMOUS,
+		-1,
+		0
+	);
+	if (allocation == NULL) return -1;
+	//check memory has been mapped as asked
+	if (allocation != allocation_start){
+		return -1;
+	}
+}
+
 void init(){
-	//====== mmap a small heap to start with ======
+	//====== initialise structures ======
 	memset(&heap_info,0,sizeof(heap_info));
+	pthread_mutex_init(&heap_info.heap_lock,NULL);
+	//====== mmap a small heap to start with ======
 	void *heap_start = mmap(NULL,INITIAL_HEAP_SIZE,PROT_READ | PROT_WRITE,MAP_PRIVATE | MAP_ANONYMOUS,-1,0);
 	heap_info.heap_start = heap_start;
 	heap_info.heap_size = INITIAL_HEAP_SIZE;
@@ -87,31 +111,76 @@ void init(){
 	first_chunk_header->checksum = calculate_chunk_checksum(first_chunk_header);
 	//====== cleanup ======
 	printf("heap initialised\n");
+	printf("sizeof(chunk_header) = %lu\n",sizeof(struct chunk_header));
 	initialised = 1;
 }
 
 void *mha_alloc(size_t size){
 	if (!initialised) init();
 	if (!initialised) return NULL; //initialisation failed
+	//lock heap
+	pthread_mutex_lock(&heap_info.heap_lock);
 	//traverse chunks
 	for (struct chunk_header *chunk = heap_info.heap_start; chunk != NULL; chunk = chunk->next){
 		//chunk is free?
 		if (chunk->is_free == 1){
 			//attempt to partition it
 			int result = split_chunk(chunk,size);
+			chunk->is_free = 0;
 			//not enough space
 			if (result < 0) continue;
-			else return chunk;
+			else {
+				//unlock heap
+				pthread_mutex_unlock(&heap_info.heap_lock);
+				return (void *)chunk + sizeof(struct chunk_header);
+			}
 		}
 	}
+	//unlock heap
+	pthread_mutex_unlock(&heap_info.heap_lock);
 	return NULL;
 }
+
 void mha_free(void *ptr){
 	if (!initialised) init();
 	if (!initialised) return; //initialisation failed
+	if (ptr == NULL) return; //ignore
+	//gain control of heap
+	pthread_mutex_lock(&heap_info.heap_lock);
+	//====== mark as free ======
 	struct chunk_header *chunk = ptr - sizeof(struct chunk_header);
 	chunk->is_free = 1;
-	//attempt to merge
+	//====== attempt to merge surrounding chunks ======
 	merge_chunk_with_next(chunk);
 	merge_chunk_with_next(chunk->prev);
+	//relinquish heap
+	pthread_mutex_unlock(&heap_info.heap_lock);
+}
+
+void *mha_realloc(void *ptr, size_t new_size){
+	//TODO
+	if (ptr == NULL) return mha_alloc(new_size);
+	//====== check chunk ======
+	struct chunk_header *chunk = ptr - sizeof(struct chunk_header);
+	size_t old_size = chunk->chunk_size;
+	//its not realy plausable to move the next chunk back to take up the space so simply ignore the request
+	if (new_size <= old_size) return ptr; 
+	//====== is there enough free space to resize in place? ======
+	if (chunk->next != NULL && chunk->next->chunk_size >= new_size - old_size){
+		//TODO
+		merge_chunk_with_next(chunk);
+	}else {
+		//====== alloc a new chunk and move the data there ======
+		//TODO
+	}
+}
+
+void print_heap_state(){
+	printf("+------------+\n");
+	for (struct chunk_header *chunk = heap_info.heap_start; chunk != NULL; chunk = chunk->next){
+		char *chunk_status[] = {"in use","free"};
+		printf("|%-12s|\n",chunk_status[chunk->is_free]);
+		printf("|%-12lu|\n",chunk->chunk_size);
+		printf("+------------+\n");
+	}
 }
