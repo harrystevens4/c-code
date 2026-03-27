@@ -99,15 +99,24 @@ int main(int argc, char **argv){
 			dest_addrlen = sizeof(struct sockaddr_in);
 			src_addr.ss_family = AF_INET;
 			dest_addr.ss_family = AF_INET;
-			char addr_buffer[64] = {0};
+			char addr_buffer_src[64] = {0};
+			char addr_buffer_dest[64] = {0};
 			printf("==> from [%s] to [%s]\n",
 				inet_ntop(AF_INET,
 					&((struct sockaddr_in *)&src_addr)->sin_addr,
-					addr_buffer,sizeof(addr_buffer)),
+					addr_buffer_src,sizeof(addr_buffer_src)),
 				inet_ntop(AF_INET,
 					&((struct sockaddr_in *)&dest_addr)->sin_addr,
-					addr_buffer,sizeof(addr_buffer))
+					addr_buffer_dest,sizeof(addr_buffer_dest))
 			);
+			//packet length
+			size_t header_length = *(uint8_t *)packet & 0x0f; //last 4 bits;
+			header_length = (header_length*32)/8; //IHL specifies number of 32 bit words
+			uint16_t total_length = ntohs(*(uint16_t *)(packet+2));
+			ip_payload = packet+header_length;
+			printf("header length %lu total length %u\n",header_length,total_length);
+			ip_payload_size = total_length-header_length;
+			printf("==> IP packet payload size [%lu] octets\n",ip_payload_size);
 			break;
 		case ETH_P_IPV6:
 			transport_protocol = *(packet+6);
@@ -122,10 +131,10 @@ int main(int argc, char **argv){
 			printf("==> From [%s] To [%s]\n",
 				inet_ntop(AF_INET6,
 					&((struct sockaddr_in6 *)&src_addr)->sin6_addr,
-					addr_buffer,sizeof(addr_buffer)),
+					addr_buffer_src,sizeof(addr_buffer_src)),
 				inet_ntop(AF_INET6,
 					&((struct sockaddr_in6 *)&dest_addr)->sin6_addr,
-					addr_buffer,sizeof(addr_buffer))
+					addr_buffer_dest,sizeof(addr_buffer_dest))
 			);
 			break;
 		}
