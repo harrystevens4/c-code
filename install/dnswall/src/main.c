@@ -114,7 +114,6 @@ int main(int argc, char **argv){
 			header_length = (header_length*32)/8; //IHL specifies number of 32 bit words
 			uint16_t total_length = ntohs(*(uint16_t *)(packet+2));
 			ip_payload = packet+header_length;
-			printf("header length %lu total length %u\n",header_length,total_length);
 			ip_payload_size = total_length-header_length;
 			printf("==> IP packet payload size [%lu] octets\n",ip_payload_size);
 			break;
@@ -136,6 +135,35 @@ int main(int argc, char **argv){
 					&((struct sockaddr_in6 *)&dest_addr)->sin6_addr,
 					addr_buffer_dest,sizeof(addr_buffer_dest))
 			);
+			//packet length
+			ip_payload = packet+40;
+			ip_payload_size = ntohs(*(uint16_t *)(packet+4));
+			printf("==> IP packet payload size [%lu] octets\n",ip_payload_size);
+			break;
+		}
+		//====== process udp packets ======
+		//ignore all non udp packets
+		if (transport_protocol != IPPROTO_UDP){
+			free(packet);
+			continue;
+		}
+		//extract port numbers
+		uint16_t src_port = ntohs(*(uint16_t *)ip_payload);
+		uint16_t dest_port = ntohs(*(uint16_t *)(ip_payload+2));
+		printf("==> Source port [%u]\n",src_port);
+		printf("==> Destination port [%u]\n",dest_port);
+		switch (src_addr.ss_family){
+		case AF_INET:
+			struct sockaddr_in *src_addr_in = (struct sockaddr_in *)&src_addr;
+			struct sockaddr_in *dest_addr_in = (struct sockaddr_in *)&src_addr;
+			src_addr_in->sin_port = htons(src_port);
+			dest_addr_in->sin_port = htons(dest_port);
+			break;
+		case AF_INET6:
+			struct sockaddr_in6 *src_addr_in6 = (struct sockaddr_in6 *)&src_addr;
+			struct sockaddr_in6 *dest_addr_in6 = (struct sockaddr_in6 *)&src_addr;
+			src_addr_in6->sin6_port = htons(src_port);
+			dest_addr_in6->sin6_port = htons(dest_port);
 			break;
 		}
 		//====== cleanup ======
