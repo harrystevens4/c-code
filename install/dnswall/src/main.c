@@ -72,19 +72,61 @@ int main(int argc, char **argv){
 			free(packet);
 			continue;
 		}
-		printf("protocol: %d\n",ntohs(ll_addr.sll_protocol));
 		if (ip_version != 4 && ip_version != 6){
 			fprintf(stderr,"received packet with invalid version.\n");
 			free(packet);
 			continue;
 		}
-		printf("new packet of size %ld received\n",packet_size);
-		printf("version: ipv%d\n",ip_version);
-		//====== filter for udp ======
+		printf("\n[%ld octets, ipv%d]\n",packet_size,ip_version);
+		//====== extract protocol specific information ======
+		struct sockaddr_storage src_addr = {0};
+		socklen_t src_addrlen = 0;
+		struct sockaddr_storage dest_addr = {0};
+		socklen_t dest_addrlen = 0;
+		char *ip_payload = NULL;
+		size_t ip_payload_size = 0;
+		uint8_t transport_protocol = 0;
+		//different for IPv4 and IPv6
 		switch (protocol){
 		case ETH_P_IP:
-			uint8_t protocol = *(packet+9);
-			printf("==> IPv4 carying protocol %s\n",protocol_name_from_number(protocol));
+			//protocol
+			transport_protocol = *(packet+9);
+			printf("==> IPv4 carying protocol %s\n",protocol_name_from_number(transport_protocol));
+			//sender and recipient
+			memcpy(&((struct sockaddr_in *)&src_addr)->sin_addr,packet+12,sizeof(struct in_addr));
+			src_addrlen = sizeof(struct sockaddr_in);
+			memcpy(&((struct sockaddr_in *)&dest_addr)->sin_addr,packet+16,sizeof(struct in_addr));
+			dest_addrlen = sizeof(struct sockaddr_in);
+			src_addr.ss_family = AF_INET;
+			dest_addr.ss_family = AF_INET;
+			char addr_buffer[64] = {0};
+			printf("==> from [%s] to [%s]\n",
+				inet_ntop(AF_INET,
+					&((struct sockaddr_in *)&src_addr)->sin_addr,
+					addr_buffer,sizeof(addr_buffer)),
+				inet_ntop(AF_INET,
+					&((struct sockaddr_in *)&dest_addr)->sin_addr,
+					addr_buffer,sizeof(addr_buffer))
+			);
+			break;
+		case ETH_P_IPV6:
+			transport_protocol = *(packet+6);
+			printf("==> IPv6 carying protocol %s\n",protocol_name_from_number(transport_protocol));
+			//sender and recipient
+			memcpy(&((struct sockaddr_in6 *)&src_addr)->sin6_addr,packet+12,sizeof(struct in6_addr));
+			src_addrlen = sizeof(struct sockaddr_in);
+			memcpy(&((struct sockaddr_in6 *)&dest_addr)->sin6_addr,packet+16,sizeof(struct in6_addr));
+			dest_addrlen = sizeof(struct sockaddr_in);
+			src_addr.ss_family = AF_INET6;
+			dest_addr.ss_family = AF_INET6;
+			printf("==> From [%s] To [%s]\n",
+				inet_ntop(AF_INET6,
+					&((struct sockaddr_in6 *)&src_addr)->sin6_addr,
+					addr_buffer,sizeof(addr_buffer)),
+				inet_ntop(AF_INET6,
+					&((struct sockaddr_in6 *)&dest_addr)->sin6_addr,
+					addr_buffer,sizeof(addr_buffer))
+			);
 			break;
 		}
 		//====== cleanup ======
