@@ -9,6 +9,7 @@
 #include <net/if.h>
 #include <net/ethernet.h>
 #include <linux/in.h>
+#include <time.h>
 
 struct __attribute__((packed)) dns_header {
 	uint16_t transaction_id;
@@ -24,6 +25,36 @@ struct dns_response {
 	uint16_t transaction_id;
 	struct sockaddr *dest_addr;
 	socklen_t dest_addrlen;
+	struct sockaddr *src_addr;
+	socklen_t src_addrlen;
+	int interface;
+};
+
+struct __attribute__((packed)) udp_header {
+	uint16_t source_port;
+	uint16_t destination_port;
+	uint16_t length;
+	uint16_t checksum;
+};
+
+struct __attribute__((packed)) ipv4_header {
+	uint8_t version_IHL;
+	uint8_t DSCP_ECN;
+	uint16_t total_length;
+	uint16_t identification;
+	uint16_t flags_fragment_offset;
+	uint8_t time_to_live;
+	uint8_t protocol;
+	uint16_t header_checksum;
+	uint32_t source_address;
+	uint32_t destination_address;
+};
+
+struct ipv4_info {
+	uint8_t protocol;
+	struct in_addr src_addr;
+	struct in_addr dest_addr;
+	int interface;
 };
 
 #define MAX_TRANSACTION_IDS 50
@@ -36,37 +67,40 @@ const char *protocol_name_from_number(int protocol);
 int dns_send_response(int send_fd, struct dns_response *response);
 void add_recent_transaction_id(uint16_t id);
 int is_transaction_id_recent(uint16_t id);
+int udp_send(int raw_sock, void *data, size_t len, struct sockaddr *src, struct sockaddr *dest, int interface);
+int ipv4_send(int raw_sock, void *data, size_t len, struct ipv4_info *ipv4_info);
 
 int main(int argc, char **argv){
+	srandom(time(NULL));
+	//====== arguments ======
 	if (argc < 2){
 		fprintf(stderr,"please specify an interface\n");
 		return 1;
 	}
 	const char *interface = argv[1];
+	int interface_index = if_nametoindex(interface);
+	if (interface == 0){
+		perror("if_nametoindex");
+		return -1;
+	}
 	//====== setup sockets ======
-	int monitor_fd = socket(AF_PACKET,SOCK_DGRAM,htons(ETH_P_ALL));
-	if (monitor_fd < 0){
+	int raw_sock = socket(AF_PACKET,SOCK_DGRAM,htons(ETH_P_ALL));
+	if (raw_sock < 0){
 		perror("socket");
 		return 1;
 	}
-	int ipv4_send_fd = socket(AF_INET,SOCK_DGRAM,0);
-	if (ipv4_send_fd < 0){
-		perror("socket");
-		close(monitor_fd);
-		return 1;
-	}
-	int ipv6_send_fd = socket(AF_INET6,SOCK_DGRAM,0);
-	if (ipv6_send_fd < 0){
-		perror("socket");
-		close(monitor_fd);
-		close(ipv4_send_fd);
+	//enable broadcast
+	const int one = 1;
+	int result = setsockopt(raw_sock,SOL_SOCKET,SO_BROADCAST,&one,sizeof(one));
+	if (result < 0){
+		perror("setsockopt(SO_BROADCAST)");
+		close(raw_sock);
 		return 1;
 	}
 	//====== enable promiscuous mode ======
-	int result = set_promisc_mode(monitor_fd,interface,1);
+	result = set_promisc_mode(raw_sock,interface,1);
 	if (result != 0){
-		close(ipv4_send_fd);
-		close(ipv6_send_fd);
+		close(raw_sock);
 		return 1;
 	}
 	//====== listen for incomming packets ======
@@ -78,24 +112,20 @@ int main(int argc, char **argv){
 		//fetch version
 		uint8_t ip_version = 0;
 		//result will be actual size of packet
-		long int packet_size = recvfrom(monitor_fd,&ip_version,sizeof(ip_version),MSG_PEEK | MSG_TRUNC,(struct sockaddr *)&ll_addr,&ll_addrlen);
+		long int packet_size = recvfrom(raw_sock,&ip_version,sizeof(ip_version),MSG_PEEK | MSG_TRUNC,(struct sockaddr *)&ll_addr,&ll_addrlen);
 		if (packet_size < 0){
 			perror("recvfrom");
-			close(monitor_fd);
-			close(ipv4_send_fd);
-			close(ipv6_send_fd);
+			close(raw_sock);
 			return 1;
 		}
 
 		ip_version >>= 4;
 		//====== receive full packet ======
 		char *packet = malloc(packet_size);
-		long result = recvfrom(monitor_fd,packet,packet_size,0,NULL,NULL);
+		long result = recvfrom(raw_sock,packet,packet_size,0,NULL,NULL);
 		if (result < 0){
 			perror("recvfrom");
-			close(monitor_fd);
-			close(ipv4_send_fd);
-			close(ipv6_send_fd);
+			close(raw_sock);
 			free(packet);
 			return 1;
 		}
@@ -205,16 +235,14 @@ int main(int argc, char **argv){
 		//====== process dns requests ======
 		//discard all non port 53 traffic
 		if (dest_port != 53){
-			free(packet);
-			continue;
+			goto cleanup;
 		}
 		//read dns headers
 		struct dns_header *dns_header = (struct dns_header *)udp_payload;
 		struct dns_response response = {0};
 		//ignore responses we send
 		if (is_transaction_id_recent(dns_header->transaction_id)){
-			free(packet);
-			continue;
+			goto cleanup;
 		}
 		//construct response
 		printf("\033[32m<====> DNS packet detected <====>\033[39m\n");
@@ -222,10 +250,13 @@ int main(int argc, char **argv){
 		response.transaction_id = dns_header->transaction_id;
 		response.dest_addr = (struct sockaddr *)&src_addr;
 		response.dest_addrlen = src_addrlen;
-		int sending_socket = (dest_addr.ss_family == AF_INET) ? ipv4_send_fd : ipv6_send_fd;
-		result = dns_send_response(sending_socket,&response);
+		response.src_addr = (struct sockaddr *)&dest_addr;
+		response.src_addrlen = dest_addrlen;
+		response.interface = interface_index;
+		result = dns_send_response(raw_sock,&response);
 		if (result < 0){
 			fprintf(stderr,"Failed to send dns response\n");
+			goto cleanup;
 		}
 		//record that the request has been responded to
 		add_recent_transaction_id(dns_header->transaction_id);
@@ -240,6 +271,7 @@ int main(int argc, char **argv){
 		}
 		printf("<== Sent response to [%s:%u], [%ld] bytes\n",addr_string_buffer,src_port,result);
 		//====== cleanup ======
+		cleanup:
 		free(packet);
 	}
 	return 0;
@@ -258,26 +290,26 @@ int is_transaction_id_recent(uint16_t id){
 	return 0;
 }
 
-int dns_send_response(int send_fd, struct dns_response *response_info){
-	//====== sending address ======
-	struct sockaddr *dest_addr = response_info->dest_addr;
-	socklen_t dest_addrlen = response_info->dest_addrlen;
+int dns_send_response(int raw_socket, struct dns_response *response_info){
+	//struct sockaddr *dest_addr = response_info->dest_addr;
+	struct sockaddr_in broadcast_addr = {
+		.sin_family = AF_INET,
+		.sin_addr = 0xffffffff,
+		.sin_port = htons(9001),//((struct sockaddr_in *)response_info->dest_addr)->sin_port,
+	};
+	struct sockaddr *dest_addr = (struct sockaddr *)&broadcast_addr;
+	struct sockaddr *src_addr = response_info->src_addr;
 	//====== send responses back ======
 	struct dns_header response = {
 		.transaction_id = response_info->transaction_id,
-		.QR_OPCODE_AA_TC_RD = htobe16(0b1000010),
-		.RA_Z_AD_CD_RCODE = htobe16(0b110110000),
+		.QR_OPCODE_AA_TC_RD = 0b10000101,
+		.RA_Z_AD_CD_RCODE = 0b10110000,
 		.question_count = 0,
 		.answer_count = 0,
 		.authority_rr_count = 0,
 		.additional_rr_count = 0,
 	};
-	int result = sendto(send_fd,&response,sizeof(response),0,dest_addr,dest_addrlen);
-	if (result < 0){
-		perror("sendto");
-		return -1;
-	}
-	return result;
+	return udp_send(raw_socket,&response,sizeof(response),src_addr,dest_addr,response_info->interface);
 }
 
 int set_promisc_mode(int socket, const char *interface, int state){
@@ -335,4 +367,86 @@ const char *protocol_name_from_number(int protocol){
 		case 262: return "MPTCP";
 		default: return "N/A";
 	}
+}
+
+int udp_send(int raw_sock, void *data, size_t len, struct sockaddr *src, struct sockaddr *dest, int interface){
+	//casting for convenience
+	struct sockaddr_in *src_in = (struct sockaddr_in *)src;
+	struct sockaddr_in *dest_in = (struct sockaddr_in *)dest;
+	struct sockaddr_in *src_in6 = (struct sockaddr_in *)src;
+	struct sockaddr_in *dest_in6 = (struct sockaddr_in *)dest;
+	//====== construct udp packet ======
+	size_t packet_len = sizeof(struct udp_header)+len;
+	struct __attribute__((packed)) {
+		struct udp_header header;
+		char data[];
+	} *packet = malloc(packet_len);
+	//fill in details
+	switch (src->sa_family){
+	case AF_INET:
+		//header
+		packet->header.source_port = htons(src_in->sin_port);
+		packet->header.destination_port = htons(dest_in->sin_port);
+		packet->header.length = htons(len);
+		//copy in the data
+		memcpy(&packet->data,data,len);
+		//====== send the ipv4 packet ======
+		struct ipv4_info ipv4_info = {
+			.src_addr = src_in->sin_addr,
+			.dest_addr = dest_in->sin_addr,
+			.protocol = IPPROTO_UDP,
+			.interface = interface,
+		};
+		int result = ipv4_send(raw_sock,packet,packet_len,&ipv4_info);
+		//cleanup
+		free(packet);
+		return result;
+	}
+	free(packet);
+	fprintf(stderr,"protocol not supported");
+	return -1;
+
+}
+
+int ipv4_send(int raw_sock, void *data, size_t len, struct ipv4_info *ipv4_info){
+	//====== prep packet ======
+	//we shall ignore options
+	size_t packet_len = len + sizeof(struct ipv4_header);
+	struct __attribute__((packed)) {
+		struct ipv4_header header;
+		char data[];
+	} *packet = malloc(packet_len);
+	memset(packet,0,packet_len);
+	//====== fill in details ======
+	//header
+	packet->header.version_IHL = (4 << 4) | 5; //no options so IHL is always 5
+	packet->header.DSCP_ECN = 0;
+	packet->header.total_length = htons(packet_len);
+	packet->header.identification = random();
+	packet->header.flags_fragment_offset = htons(1 << 14);
+	packet->header.time_to_live = 5;
+	packet->header.protocol = htons(ipv4_info->protocol);
+	memcpy(&packet->header.source_address,&ipv4_info->src_addr,sizeof(ipv4_info->src_addr));
+	memcpy(&packet->header.destination_address,&ipv4_info->dest_addr,sizeof(ipv4_info->dest_addr));
+	//calculate checksum
+	uint16_t total = 0;
+	for (int i = 0; i < 10; i++){
+		total += ~ntohs(((uint16_t *)packet)[i]);
+	}
+	packet->header.header_checksum = ~htons(total);
+	//====== send the packet ======
+	struct sockaddr_ll addr = {
+		.sll_family = AF_PACKET,
+		.sll_protocol = htons(ETH_P_IP),
+		.sll_ifindex = ipv4_info->interface,
+		.sll_addr = {0xff,0xff,0xff,0xff,0xff,0xff},
+		.sll_halen = 6,
+	};
+	long result = sendto(raw_sock,packet,packet_len,0,(struct sockaddr *)&addr,sizeof(addr));
+	if (result < 0){
+		perror("sendto");
+	}
+	//cleanup
+	free(packet);
+	return result;
 }
