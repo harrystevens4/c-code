@@ -218,13 +218,13 @@ int main(int argc, char **argv){
 		switch (src_addr.ss_family){
 		case AF_INET:
 			struct sockaddr_in *src_addr_in = (struct sockaddr_in *)&src_addr;
-			struct sockaddr_in *dest_addr_in = (struct sockaddr_in *)&src_addr;
+			struct sockaddr_in *dest_addr_in = (struct sockaddr_in *)&dest_addr;
 			src_addr_in->sin_port = htons(src_port);
 			dest_addr_in->sin_port = htons(dest_port);
 			break;
 		case AF_INET6:
 			struct sockaddr_in6 *src_addr_in6 = (struct sockaddr_in6 *)&src_addr;
-			struct sockaddr_in6 *dest_addr_in6 = (struct sockaddr_in6 *)&src_addr;
+			struct sockaddr_in6 *dest_addr_in6 = (struct sockaddr_in6 *)&dest_addr;
 			src_addr_in6->sin6_port = htons(src_port);
 			dest_addr_in6->sin6_port = htons(dest_port);
 			break;
@@ -291,13 +291,13 @@ int is_transaction_id_recent(uint16_t id){
 }
 
 int dns_send_response(int raw_socket, struct dns_response *response_info){
-	//struct sockaddr *dest_addr = response_info->dest_addr;
-	struct sockaddr_in broadcast_addr = {
-		.sin_family = AF_INET,
-		.sin_addr = 0xffffffff,
-		.sin_port = htons(9001),//((struct sockaddr_in *)response_info->dest_addr)->sin_port,
-	};
-	struct sockaddr *dest_addr = (struct sockaddr *)&broadcast_addr;
+	struct sockaddr *dest_addr = response_info->dest_addr;
+	//struct sockaddr_in broadcast_addr = {
+	//	.sin_family = AF_INET,
+	//	.sin_addr = 0xffffffff,
+	//	.sin_port = ((struct sockaddr_in *)response_info->dest_addr)->sin_port,
+	//};
+	//struct sockaddr *dest_addr = (struct sockaddr *)&broadcast_addr;
 	struct sockaddr *src_addr = response_info->src_addr;
 	//====== send responses back ======
 	struct dns_header response = {
@@ -385,9 +385,9 @@ int udp_send(int raw_sock, void *data, size_t len, struct sockaddr *src, struct 
 	switch (src->sa_family){
 	case AF_INET:
 		//header
-		packet->header.source_port = htons(src_in->sin_port);
-		packet->header.destination_port = htons(dest_in->sin_port);
-		packet->header.length = htons(len);
+		packet->header.source_port = src_in->sin_port;
+		packet->header.destination_port = dest_in->sin_port;
+		packet->header.length = htons(packet_len);
 		//copy in the data
 		memcpy(&packet->data,data,len);
 		//====== send the ipv4 packet ======
@@ -425,9 +425,11 @@ int ipv4_send(int raw_sock, void *data, size_t len, struct ipv4_info *ipv4_info)
 	packet->header.identification = random();
 	packet->header.flags_fragment_offset = htons(1 << 14);
 	packet->header.time_to_live = 5;
-	packet->header.protocol = htons(ipv4_info->protocol);
+	packet->header.protocol = ipv4_info->protocol;
 	memcpy(&packet->header.source_address,&ipv4_info->src_addr,sizeof(ipv4_info->src_addr));
 	memcpy(&packet->header.destination_address,&ipv4_info->dest_addr,sizeof(ipv4_info->dest_addr));
+	//data
+	memcpy(&packet->data,data,len);
 	//calculate checksum
 	uint16_t total = 0;
 	for (int i = 0; i < 10; i++){
@@ -439,8 +441,8 @@ int ipv4_send(int raw_sock, void *data, size_t len, struct ipv4_info *ipv4_info)
 		.sll_family = AF_PACKET,
 		.sll_protocol = htons(ETH_P_IP),
 		.sll_ifindex = ipv4_info->interface,
-		.sll_addr = {0xff,0xff,0xff,0xff,0xff,0xff},
-		.sll_halen = 6,
+		//.sll_addr = {0xff,0xff,0xff,0xff,0xff,0xff},
+		//.sll_halen = 6,
 	};
 	long result = sendto(raw_sock,packet,packet_len,0,(struct sockaddr *)&addr,sizeof(addr));
 	if (result < 0){
