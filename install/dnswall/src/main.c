@@ -28,6 +28,8 @@ struct dns_response {
 	struct sockaddr *src_addr;
 	socklen_t src_addrlen;
 	int interface;
+	char destination_mac[8];
+	int destination_mac_len;
 };
 
 struct __attribute__((packed)) udp_header {
@@ -55,6 +57,16 @@ struct ipv4_info {
 	struct in_addr src_addr;
 	struct in_addr dest_addr;
 	int interface;
+	char destination_mac[8];
+	int destination_mac_len;
+};
+
+struct udp_info {
+	struct sockaddr *src_addr;
+	struct sockaddr *dest_addr;
+	int interface;
+	char destination_mac[8];
+	int destination_mac_len;
 };
 
 #define MAX_TRANSACTION_IDS 50
@@ -67,7 +79,7 @@ const char *protocol_name_from_number(int protocol);
 int dns_send_response(int send_fd, struct dns_response *response);
 void add_recent_transaction_id(uint16_t id);
 int is_transaction_id_recent(uint16_t id);
-int udp_send(int raw_sock, void *data, size_t len, struct sockaddr *src, struct sockaddr *dest, int interface);
+int udp_send(int raw_sock, void *data, size_t len, struct udp_info *udp_info);
 int ipv4_send(int raw_sock, void *data, size_t len, struct ipv4_info *ipv4_info);
 
 int main(int argc, char **argv){
@@ -253,6 +265,8 @@ int main(int argc, char **argv){
 		response.src_addr = (struct sockaddr *)&dest_addr;
 		response.src_addrlen = dest_addrlen;
 		response.interface = interface_index;
+		response.destination_mac_len = ll_addr.sll_halen;
+		memcpy(&response.destination_mac,&ll_addr.sll_addr,ll_addr.sll_halen);
 		result = dns_send_response(raw_sock,&response);
 		if (result < 0){
 			fprintf(stderr,"Failed to send dns response\n");
@@ -309,7 +323,14 @@ int dns_send_response(int raw_socket, struct dns_response *response_info){
 		.authority_rr_count = 0,
 		.additional_rr_count = 0,
 	};
-	return udp_send(raw_socket,&response,sizeof(response),src_addr,dest_addr,response_info->interface);
+	struct udp_info udp_info = {
+		.src_addr = response_info->src_addr,
+		.dest_addr = response_info->dest_addr,
+		.interface = response_info->interface,
+		.destination_mac_len = response_info->destination_mac_len,
+	};
+	memcpy(&udp_info.destination_mac,&response_info->destination_mac,response_info->destination_mac_len);
+	return udp_send(raw_socket,&response,sizeof(response),&udp_info);
 }
 
 int set_promisc_mode(int socket, const char *interface, int state){
@@ -369,12 +390,12 @@ const char *protocol_name_from_number(int protocol){
 	}
 }
 
-int udp_send(int raw_sock, void *data, size_t len, struct sockaddr *src, struct sockaddr *dest, int interface){
+int udp_send(int raw_sock, void *data, size_t len, struct udp_info *udp_info){
 	//casting for convenience
-	struct sockaddr_in *src_in = (struct sockaddr_in *)src;
-	struct sockaddr_in *dest_in = (struct sockaddr_in *)dest;
-	struct sockaddr_in *src_in6 = (struct sockaddr_in *)src;
-	struct sockaddr_in *dest_in6 = (struct sockaddr_in *)dest;
+	struct sockaddr_in *src_in = (struct sockaddr_in *)udp_info->src_addr;
+	struct sockaddr_in *dest_in = (struct sockaddr_in *)udp_info->dest_addr;
+	struct sockaddr_in *src_in6 = (struct sockaddr_in *)udp_info->src_addr;
+	struct sockaddr_in *dest_in6 = (struct sockaddr_in *)udp_info->dest_addr;
 	//====== construct udp packet ======
 	size_t packet_len = sizeof(struct udp_header)+len;
 	struct __attribute__((packed)) {
@@ -382,7 +403,7 @@ int udp_send(int raw_sock, void *data, size_t len, struct sockaddr *src, struct 
 		char data[];
 	} *packet = malloc(packet_len);
 	//fill in details
-	switch (src->sa_family){
+	switch (udp_info->src_addr->sa_family){
 	case AF_INET:
 		//header
 		packet->header.source_port = src_in->sin_port;
@@ -395,8 +416,10 @@ int udp_send(int raw_sock, void *data, size_t len, struct sockaddr *src, struct 
 			.src_addr = src_in->sin_addr,
 			.dest_addr = dest_in->sin_addr,
 			.protocol = IPPROTO_UDP,
-			.interface = interface,
+			.interface = udp_info->interface,
+			.destination_mac_len = udp_info->destination_mac_len,
 		};
+		memcpy(&ipv4_info.destination_mac,&udp_info->destination_mac,udp_info->destination_mac_len);
 		int result = ipv4_send(raw_sock,packet,packet_len,&ipv4_info);
 		//cleanup
 		free(packet);
@@ -441,9 +464,9 @@ int ipv4_send(int raw_sock, void *data, size_t len, struct ipv4_info *ipv4_info)
 		.sll_family = AF_PACKET,
 		.sll_protocol = htons(ETH_P_IP),
 		.sll_ifindex = ipv4_info->interface,
-		//.sll_addr = {0xff,0xff,0xff,0xff,0xff,0xff},
-		//.sll_halen = 6,
+		.sll_halen = ipv4_info->destination_mac_len,
 	};
+	memcpy(&addr.sll_addr,&ipv4_info->destination_mac,ipv4_info->destination_mac_len);
 	long result = sendto(raw_sock,packet,packet_len,0,(struct sockaddr *)&addr,sizeof(addr));
 	if (result < 0){
 		perror("sendto");
