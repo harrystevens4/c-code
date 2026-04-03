@@ -390,6 +390,32 @@ const char *protocol_name_from_number(int protocol){
 	}
 }
 
+uint16_t udpv4_calculate_checksum(void *data, size_t len, struct udp_info *udp_info){
+	uint32_t total = 0;
+	//====== get info for pseudo IPv4 header ======
+	struct in_addr *src_addr = &((struct sockaddr_in *)udp_info->src_addr)->sin_addr;
+	struct in_addr *dest_addr = &((struct sockaddr_in *)udp_info->dest_addr)->sin_addr;
+	total +=  (*(uint32_t *)src_addr >> 16) & 0xffff;
+	total +=  (*(uint32_t *)src_addr) & 0xffff;
+	total +=  (*(uint32_t *)dest_addr >> 16) & 0xffff;
+	total +=  (*(uint32_t *)dest_addr) & 0xffff;
+	total += htons(IPPROTO_UDP);
+	struct udp_header *udp_header = data;
+	total += udp_header->length;
+	//====== sum the rest of the packet ======
+	for (int i = 0; i < len; i+=2){
+		total += ((uint16_t *)data)[i/2];
+	}
+	if (len % 2 != 0){
+		total += (uint16_t)((uint8_t *)data)[len-1] << 8;
+	}
+	total = (total >> 16) + (total & 0xffff); //add top 16 bits to lower 16 bits
+	total += (total >> 16); //carry
+	uint16_t checksum = ~(uint16_t)total;
+	if (checksum == 0) checksum = 0xffff;
+	return checksum;
+}
+
 int udp_send(int raw_sock, void *data, size_t len, struct udp_info *udp_info){
 	//casting for convenience
 	struct sockaddr_in *src_in = (struct sockaddr_in *)udp_info->src_addr;
@@ -411,6 +437,9 @@ int udp_send(int raw_sock, void *data, size_t len, struct udp_info *udp_info){
 		packet->header.length = htons(packet_len);
 		//copy in the data
 		memcpy(&packet->data,data,len);
+		//checksum
+		packet->header.checksum = 0;
+		packet->header.checksum = udpv4_calculate_checksum(packet,packet_len,udp_info);
 		//====== send the ipv4 packet ======
 		struct ipv4_info ipv4_info = {
 			.src_addr = src_in->sin_addr,
