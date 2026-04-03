@@ -454,11 +454,13 @@ int ipv4_send(int raw_sock, void *data, size_t len, struct ipv4_info *ipv4_info)
 	//data
 	memcpy(&packet->data,data,len);
 	//calculate checksum
-	uint16_t total = 0;
+	uint32_t total = 0;
 	for (int i = 0; i < 10; i++){
-		total += ~ntohs(((uint16_t *)packet)[i]);
+		total += ((uint16_t *)packet)[i];
 	}
-	packet->header.header_checksum = ~htons(total);
+	total = (total >> 16) + (total & 0xffff); //add top 16 bits to lower 16 bits
+	total += (total >> 16); //carry
+	packet->header.header_checksum = ~total;
 	//====== send the packet ======
 	struct sockaddr_ll addr = {
 		.sll_family = AF_PACKET,
