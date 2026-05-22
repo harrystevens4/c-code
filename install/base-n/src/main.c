@@ -5,6 +5,7 @@
 
 void print_help();
 ssize_t base32_decode(char *input, size_t input_len, char *output);
+ssize_t base64_decode(char *input, size_t input_len, char *output);
 
 int main(int argc, char **argv){
 	//====== handle arguments ======
@@ -24,15 +25,15 @@ int main(int argc, char **argv){
 	char *input = argv[2];
 	size_t input_len = strlen(argv[2]);
 	//validate
-	if (input_len % 8 != 0){
+	if (input_len % 4 != 0){
 		fprintf(stderr,"Invalid input\n");
 		return EXIT_FAILURE;
 	}
 	//im using alloca because it seems cool
-	ssize_t output_len = (input_len*5) / 8;
+	ssize_t output_len = (input_len*6) / 8;
 	char *output = alloca(output_len);
 	memset(output,0,output_len);
-	output_len = base32_decode(input,input_len,output);
+	output_len = base64_decode(input,input_len,output);
 	if (output_len < 0){
 		fprintf(stderr,"Could not decode\n");
 		return EXIT_FAILURE;
@@ -79,4 +80,33 @@ ssize_t base32_decode(char *input, size_t input_len, char *output){
 	//calculate the length
 	long input_no_pad_len = (long)(strchrnul(input,'=') - input);
 	return (input_no_pad_len*5)/8;
+}
+
+ssize_t base64_decode(char *input, size_t input_len, char *output){
+	//base64 char mapping macro
+	#define B64D(c) (\
+		/*if*/ (c >= 'A' && c <= 'Z') ? /*return*/(c - 65) : (\
+		/*else if*/ (c >= 'a' && c <= 'z') ? /*return*/(c - 97 + 26) : (\
+		/*else if*/ (c == '+') ? /*return*/(62) : (\
+		/*else if*/	(c == '/') ? /*return*/(63) : (\
+		/*else if*/	(c >= '0' && c <= '9') ? /*return*/(c - 48 + 26 + 26) : \
+		/*else*/ /*return*/(0)\
+		))))\
+	)
+	//valid length of input
+	if (input_len % 4 != 0) return -1;
+	//00000000 00000000 00000000
+	//|----||-----||-----||----|
+	size_t output_len = 0;
+	//work with 3 bytes at a time
+	for (size_t i = 0; i < input_len;){
+		output[output_len+0] = ((B64D(input[i+0]) << 2) | (B64D(input[i+1]) >> 4)) & 0xff;
+		output[output_len+1] = ((B64D(input[i+1]) << 4) | (B64D(input[i+2]) >> 2)) & 0xff;
+		output[output_len+2] = ((B64D(input[i+2]) << 6) | (B64D(input[i+3])     )) & 0xff;
+		i += 4;
+		output_len += 3;
+	}
+	//calculate the length
+	long input_no_pad_len = (long)(strchrnul(input,'=') - input);
+	return (input_no_pad_len*6)/8;
 }
