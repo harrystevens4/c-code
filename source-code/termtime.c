@@ -24,16 +24,18 @@ int main(int argc, char **argv){
 	char *clock_format_string = "%H:%M:%S";
 	int timer_mode = 0;
 	time_t timer_end_time = 0;
+	time_t timer_length = 0;
 	//====== process command line arguments ======
 	struct option long_options[] = {
 		{"help",no_argument,0,'h'},
 		{"format",required_argument,0,'f'},
 		{"timer",no_argument,0,'t'},
+		{"seconds",required_argument,0,'s'},
 		{0,0,0,0},
 	};
 	for (;;){
 		int option_index = 0;
-		int c = getopt_long(argc,argv,"hf:t",long_options,&option_index);
+		int c = getopt_long(argc,argv,"hf:ts:",long_options,&option_index);
 		if (c == -1) break;
 		switch (c){
 		case 'h':
@@ -41,6 +43,14 @@ int main(int argc, char **argv){
 			return 0;
 		case 'f':
 			clock_format_string = optarg;
+			break;
+		case 's':
+			char *endptr = NULL;
+			timer_length = strtol(optarg,&endptr,10);
+			if (*endptr != '\0'){
+				fprintf(stderr,"seconds argument is not valid integer\n");
+				return 1;
+			}
 			break;
 		case 't':
 			timer_mode = 1;
@@ -55,7 +65,7 @@ int main(int argc, char **argv){
 	keypad(stdscr,true);
 	refresh();
 	//====== initialise the timer if requested ======
-	time_t timer_length = (timer_mode) ? prompt_for_timer_length() : 0;
+	if (timer_mode && timer_length == 0) timer_length = prompt_for_timer_length();
 	if (timer_mode) timer_end_time = timer_length + time(NULL);
 	//====== block SIGIO, SIGALRM, SIGINT and SIGWINCH  ======
 	//that way we can be completely signal driven
@@ -150,6 +160,7 @@ void print_help(char *name){
 	printf("	-h, --help       : print help text\n");
 	printf("	-t, --timer       : start as a timer\n");
 	printf("	-f, --format <s> : use s as the strftime format string\n");
+	printf("	-s, --seconds <n> : if -t is passed, start the timer with n seconds\n");
 }
 
 int setup_stdin(){
