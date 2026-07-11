@@ -42,11 +42,11 @@ ssize_t base32_decode(char *input, size_t input_len, char *output){
 ssize_t base64_decode(char *input, size_t input_len, char *output){
 	//base64 char mapping macro
 	#define B64D(c) (\
-		/*if*/ (c >= 'A' && c <= 'Z') ? /*return*/(c - 65) : (\
-		/*else if*/ (c >= 'a' && c <= 'z') ? /*return*/(c - 97 + 26) : (\
+		/*if*/ (c >= 'A' && c <= 'Z') ? /*return*/(c - 'A') : (\
+		/*else if*/ (c >= 'a' && c <= 'z') ? /*return*/(c - 'a' + 26) : (\
 		/*else if*/ (c == '+') ? /*return*/(62) : (\
 		/*else if*/	(c == '/') ? /*return*/(63) : (\
-		/*else if*/	(c >= '0' && c <= '9') ? /*return*/(c - 48 + 26 + 26) : \
+		/*else if*/	(c >= '0' && c <= '9') ? /*return*/(c - '0' + 26 + 26) : \
 		/*else*/ /*return*/(0)\
 		))))\
 	)
