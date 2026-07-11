@@ -6,6 +6,9 @@
 #include <sys/socket.h>
 #include <netdb.h>
 #include <string.h>
+#include "../../../source-code/base_n.h"
+#include "../../../source-code/crypto.h"
+#include <alloca.h>
 
 #define PORT 19532
 #define STRING(x) S(x)
@@ -50,27 +53,47 @@ client         remoteunlockd
   |                 |
 */
 
+void print_help(void);
+
 int main(int argc, char **argv){
 	const struct option long_options[] = {
 		{"unlock-command",required_argument,0,'u'},
 		{"lock-command",required_argument,0,'l'},
+		{"secret-key",required_argument,0,'k'},
+		{"help",no_argument,0,'h'},
 		{0,0,0,0}
 	};
 	char commands[2][1024] = {0};
+	char *secret_key = NULL;
+	ssize_t secret_key_len = 0;
 	//====== digest command line ======
 	for (;;){
 		int option_index = 0;
-		int result = getopt_long(argc,argv,"u:",long_options,&option_index);
+		int result = getopt_long(argc,argv,"u:l:k:h",long_options,&option_index);
 		if (result == -1) break;
 		switch (result){
 		case 'u':
 			strncpy(commands[ACTION_UNLOCK],optarg,sizeof(commands[ACTION_UNLOCK])-1);
 			break;
-		}
 		case 'l':
 			strncpy(commands[ACTION_LOCK],optarg,sizeof(commands[ACTION_LOCK])-1);
 			break;
+		case 'k':
+			secret_key = alloca((strlen(optarg)*5)/8);
+			secret_key_len = base32_decode(optarg,strlen(optarg),secret_key);
+			if (secret_key_len < 0){
+				fprintf(stderr,"secret key not valid base 32\n");
+				return EXIT_FAILURE;
+			}
+			break;
+		case 'h':
+			print_help();
+			return EXIT_SUCCESS;
 		}
+	}
+	if (secret_key == NULL){
+		fprintf(stderr,"Please provide a secret key (see --help for help)\n");
+		return EXIT_FAILURE;
 	}
 	//====== setup network ======
 	//getaddrinfo
@@ -137,7 +160,7 @@ int main(int argc, char **argv){
 		}
 		//====== auth_response ======
 		struct auth_response response = {0};
-		if (recv(connection,&challenge,sizeof(response),0) < 0){
+		if (recv(connection,&response,sizeof(response),0) < 0){
 			perror("recv");
 			fprintf(stderr,"auth response not received\n");
 			goto cleanup;
@@ -145,9 +168,21 @@ int main(int argc, char **argv){
 		//====== validate response ======
 		int auth_status = 0;
 		//TODO TODO TODO
-		auth_status = 1; //add authentication
-		//TODO TODO TODO
-		//cleanup
+		//concatenate entropy and secret key
+		char *hash_input = alloca(64+secret_key_len);
+		memcpy(hash_input,&challenge.entropy,sizeof(challenge.entropy));
+		memcpy(hash_input+64,secret_key,secret_key_len);
+		unsigned char digest[32] = {0};
+		//hash result
+		sha256(hash_input,64+secret_key_len,digest);
+		//compare hashes
+		if (memcmp(digest,&response.digest,32) == 0){
+			printf("authentication successfull\n");
+			auth_status = 1;
+		}else {
+			fprintf(stderr,"authentication failed (missmatched hash values)\n");
+			auth_status = 0;
+		}
 		//====== perform action ======
 		int action_status = 0;
 		if (auth_status == 1 && requested_action < sizeof(commands)/sizeof(commands[0])){
@@ -172,4 +207,16 @@ int main(int argc, char **argv){
 		printf("connection closed\n");
 	}
 	return 0;
+}
+
+void print_help(){
+	printf("usage: remoteunlockd [options]\n");
+	printf("options:\n");
+	printf("	-h, --help                 : show this help text\n");
+	printf("	-k, --secret-key <key>     : provide the base32 secret key to use\n");
+	printf("	-u, --unlock-command <cmd> : run this command when unlock is requested\n");
+	printf("	-l, --lock-command <cmd>   : run this command when lock is requested\n");
+	printf("instructions:\n");
+	printf("pick a random secret key to use for both the mobile app and daemon.\n");
+	printf("when the mobile app requests an action, if the secret keys match, it will run the relevant command.\n");
 }
