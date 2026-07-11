@@ -79,10 +79,10 @@ int main(int argc, char **argv){
 			strncpy(commands[ACTION_LOCK],optarg,sizeof(commands[ACTION_LOCK])-1);
 			break;
 		case 'k':
-			secret_key = alloca((strlen(optarg)*5)/8);
-			secret_key_len = base32_decode(optarg,strlen(optarg),secret_key);
+			secret_key = alloca((strlen(optarg)*6)/8);
+			secret_key_len = base64_decode(optarg,strlen(optarg),secret_key);
 			if (secret_key_len < 0){
-				fprintf(stderr,"secret key not valid base 32\n");
+				fprintf(stderr,"secret key not valid base 64\n");
 				return EXIT_FAILURE;
 			}
 			break;
@@ -213,7 +213,7 @@ void print_help(){
 	printf("usage: remoteunlockd [options]\n");
 	printf("options:\n");
 	printf("	-h, --help                 : show this help text\n");
-	printf("	-k, --secret-key <key>     : provide the base32 secret key to use\n");
+	printf("	-k, --secret-key <key>     : provide the base64 secret key to use\n");
 	printf("	-u, --unlock-command <cmd> : run this command when unlock is requested\n");
 	printf("	-l, --lock-command <cmd>   : run this command when lock is requested\n");
 	printf("instructions:\n");
