@@ -52,18 +52,23 @@ client         remoteunlockd
 
 int main(int argc, char **argv){
 	const struct option long_options[] = {
-		{"unlock-command",required_argument,NULL,'c'},
+		{"unlock-command",required_argument,0,'u'},
+		{"lock-command",required_argument,0,'l'},
 		{0,0,0,0}
 	};
-	char unlock_command[1024] = {0};
+	char commands[2][1024] = {0};
 	//====== digest command line ======
 	for (;;){
 		int option_index = 0;
-		int result = getopt_long(argc,argv,"c:",long_options,&option_index);
+		int result = getopt_long(argc,argv,"u:",long_options,&option_index);
 		if (result == -1) break;
 		switch (result){
-		case 'c':
-			strncpy(unlock_command,optarg,sizeof(unlock_command)-1);
+		case 'u':
+			strncpy(commands[ACTION_UNLOCK],optarg,sizeof(commands[ACTION_UNLOCK])-1);
+			break;
+		}
+		case 'l':
+			strncpy(commands[ACTION_LOCK],optarg,sizeof(commands[ACTION_LOCK])-1);
 			break;
 		}
 	}
@@ -119,7 +124,8 @@ int main(int argc, char **argv){
 			fprintf(stderr,"auth request not received\n");
 			goto cleanup;
 		}
-		int requested_action = ntohl(request.action);
+		unsigned long requested_action = ntohl(request.action);
+		printf("requested action: %lu\n",requested_action);
 		//====== auth_challenge ======
 		struct auth_challenge challenge = {0};
 		//get random data
@@ -142,15 +148,24 @@ int main(int argc, char **argv){
 		auth_status = 1; //add authentication
 		//TODO TODO TODO
 		//cleanup
+		//====== perform action ======
+		int action_status = 0;
+		if (auth_status == 1 && requested_action < sizeof(commands)/sizeof(commands[0])){
+			printf("executing \"%s\"\n",commands[requested_action]);
+			system(commands[requested_action]);
+		}else {
+			action_status = 1;
+		}
 		//====== request_status ======
 		struct request_status status = {
-			.status = (auth_status == 1) ? 0 : 1,
+			.status = action_status,
 		};
 		if (send(connection,&status,sizeof(status),0) < 0){
 			perror("send");
 			fprintf(stderr,"request status could not be sent\n");
 			goto cleanup;
 		}
+		printf("%s\n",(action_status == 0) ? "request successfull" : "request failed");
 		//====== cleanup ======
 		cleanup:
 		close(connection);
