@@ -147,7 +147,7 @@ int main(int argc, char **argv){
 			fprintf(stderr,"auth request not received\n");
 			goto cleanup;
 		}
-		unsigned long requested_action = ntohl(request.action);
+		unsigned long requested_action = be64toh(request.action);
 		printf("requested action: %lu\n",requested_action);
 		//====== auth_challenge ======
 		struct auth_challenge challenge = {0};
