@@ -1,106 +1,13 @@
 //Program for quickly discovering a device with specific hostname on the network
-/*
-Here is the standard
-See all relevant structs and enums below
+//find documentation in header file
+#include "quick-discover.h"
 
-=== filtering ===
-
-setting the hostname and/or service in the discover
-will cause only servers with matching hostnames or services
-to respond. setting the service to all '\0's will cause the service to be
-ignored, and setting the hostname length to 0 will cause the hostname to be ignored
-
-=== only one qd service running ===
-
-client                      server
-   |  qd_discover_packet      |
-   |------------------------->|
-   |                          |
-   |  qd_response_packet      |
-   |<-------------------------|
-   |
-   |
-   \
-   clients ip is {w.x.y.z}
-
-   responses will only come from servers
-   with matching hostnames to that set
-   in the discover packet
-
-=== multiple qd services running on one server ===
-
-client                           server
-   |  qd_discover_packet           |
-   | {hostname = "desktop-abc"}    |
-   |------------------------------>|
-   |                               |
-   |                               |\
-   |       qd_response_packet      | |\
-   |<------------------------------| | |
-   |       qd_response_packet      | | |
-   |<--------------------------------| |
-   |       qd_repsonse_packet      | | |
-   |<----------------------------------|
-   |                               | | |
-   |                               | |  \
-   |                               | |   service 3
-   |                               |  \
-   |                               |   service 2
-   |                                \
-   \                                 service 1
-   `desktop-abc` ip is {w.x.y.z}; service `TIME`
-   `desktop-abc` ip is {w.x.y.z}; service `PWRSWTCH`
-   `desktop-abc` ip is {w.x.y.z}; service `BUZZER`
-
-   qd_recv_response() will receive one response
-
-   calling qd_recv_response() repeatedly untill a timeout
-   or untill you find a server with the correct service
-   is a great way to use this.
-   dont forget you can use poll() on the qd file descriptor
-   to see if there is a response pending.
-
-=== multiple qd services running on different servers
-
-                                    "desktop-a"
-                                    / "desktop-b" has service TIME
-                                   |  / "desktop-c"
-client                             | |  / "desktop-d" has service TIME
-   |  qd_discover_packet           | | |  /
-   |   {hostname_len = 0,          | | | |
-   |   service = "TIME"}           | | | |
-   |------------------------------>+-+-+-+
-   |                               | | | |
-   |       qd_response_packet      | | | |
-   |<--------------------------------| | |
-   |       qd_response_packet      | | | |
-   |<------------------------------------|
-   |                               | | | |
-   |                               | | | |
-   \
-   `desktop-b` ip is {w.x.y.z}; service `TIME`
-   `desktop-d` ip is {w.x.y.z}; service `TIME`
-
-   setting the `hostname_len` to 0 will cause
-   all available services on all available devices
-   to respond, but setting the service here will
-   mean only those services on those devices will
-
-*/
-
-#define SERVICE_LEN 12
-//all fields are stored in network byte order (obviously)
-struct __attribute__((packed)) qd_discover_packet {
-	char hostname[255];
-	uint8_t hostname_len;
-	char service[SERVICE_LEN]; //only used when hostname_len = 0
+struct _qd_server_thread_arg {
+	char service[SERVICE_LEN];
+	volatile int init_status;
 };
-struct __attribute__((packed)) qd_response_packet {
-	char hostname[255];
-	uint8_t hostname_len;
-	char service[SERVICE_LEN]; //small string to identify what service is being offered
-	struct sockaddr_storage address;
-};
+
+//all functions return 0 or > 0 on success and < 0 on error
 
 //============ client use ============
 //------ low level ------
@@ -119,25 +26,73 @@ int qd_recv_discover(int qdfd, struct qd_discover_packet *discover){
 }
 int qd_server_socket(){
 }
-static void _qd_server_thread(void *service_p){
-	//the stack is more goated than the heap
+static void _qd_server_thread(void *_qd_server_thread_arg){
+	//==== setup ====
+	struct _qd_server_thread_arg *arg = _qd_server_thread_arg;
+	//extract the service
 	char service[SERVICE_LEN] = {0};
-	memcpy(service,service_p,SERVICE_LEN);
-	free(service_p);
-	//=== setup socket ===
-	//=== listening loop ===
+	memcpy(service,&arg->service,SERVICE_LEN);
+	//grab hostname
+	char hostname[HOSTNAME_MAX_LEN+1] = {0};
+	int result = gethostname(hostname,HOSTNAME_MAX_LEN);
+	if (result < 0){
+		arg->init_status = -errno;
+		return;
+	}
+	uint8_t hostname_len = strlen(hostname);
+	//get a socket
+	int socket = qd_server_socket();
+	if (socket < 0){
+		arg->init_status = -errno;
+		return;
+	}
+	//signal setup was successful
+	arg->init_status = 1;
+	//==== listening loop ====
+	for (;;){
+		//listen for discover requests
+		struct qd_discover_packet discover_packet;
+		int result = qd_recv_discover(socket,&discover_packet);
+		if (result < 0){
+			perror("qd_recv_discover");
+			continue;
+		}
+		//filter any non relevant requests
+		if (discover_packet.hostname_len != 0 ){
+			if (strncmp(hostname,discover_packet.hostname,discover_packet.hostname_len) != 0) continue;
+		}
+		if (disover_packet.service[0] != '\0'){
+			if (strncmp(discover_packet.service,service,SERVICE_LEN) != 0) continue;
+		}
+		//reply
+		struct qd_response_packet response_packet = {0}
+		response_packet.hostname_len = hostname_len;
+		memcpy(&response_packet.hostname,hostname,hostname_len);
+		//TODO
+	}
 }
 //------ high level ------
 //spawns a thread that advertises the given service
-pthread_t start_qd_server(const char service[SERVICE_LEN]){
-	//prevent race condition where service dropped before thread starts
-	char *service_copy = malloc(SERVICE_LEN); //i hope malloc is thread safe
-	memcpy(service_copy,service,SERVICE_LEN);
+//returns 0 on failure and > 0 on success
+pthread_t start_qd_server(const char *service){
+	volatile struct _qd_server_thread_arg arg = {
+		.init_status = 0,
+	};
+	memcpy(&arg.service,service,SERVICE_LEN);
 	//create new thread
 	pthread_t thread;
 	int result = pthread_create(&thread,NULL,&_qd_server_thread,service_copy);
-	//return
-	return thread;
+	//TODO this could definitely be done better
+	//spin untill thread has initialised
+	while (arg.init_status == 0);
+	//check initialisation status
+	if (arg.init_status < 0){
+		errno = -arg.init_status;
+		return 0;
+	}else {
+		//return
+		return thread;
+	}
 }
 void stop_qd_server(pthread_t server_thread){
 	pthread_cancel(server_thread);
