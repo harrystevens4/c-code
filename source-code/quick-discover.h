@@ -103,6 +103,7 @@ struct __attribute__((packed)) qd_response_packet {
 	uint8_t hostname_len;
 	char service[SERVICE_LEN]; //small string to identify what service is being offered
 	struct sockaddr_storage address;
+	socklen_t address_len;
 };
 
 
