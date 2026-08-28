@@ -25,28 +25,66 @@ static void _close_shim(void *arg){
 //============ client use ============
 //------ low level ------
 int qd_recv_response(int qdfd, struct qd_response_packet *response){
-	//TODO
+	/*if we just go with what the sender sent us rather than
+	what address we received from than it is much more flexible
+	because we could have one server that advertises for all the other devices
+	which would allow things like load balancing by providing different machine
+	addresses on a round robin or something*/
+	return recvfrom(qdfd,response,sizeof(*response),0,NULL,NULL);
 }
 int qd_send_discover(int qdfd, const struct qd_discover_packet *discover){
-	//TODO
+	//im just gonna put the ipv4 in the bag because i cba rn with ipv6
+	const struct sockaddr_in broadcast_addr = {
+		.sin_family = htons(AF_INET),
+		.sin_port = htons(QD_PORT),
+		.sin_addr = {
+			.s_addr = 0xffffffff,
+		},
+	};
+	socklen_t broadcast_addr_len = sizeof(struct sockaddr_in);
+	return sendto(qdfd,discover,sizeof(*discover),0,&broadcast_addr,broadcast_addr_len);
 }
 int qd_client_socket(){
-	//TODO
-	getaddrinfo();
-	int fd = socket(address_info->ai_family,address_info->ai_socktype,0);
+	int fd = socket(AF_INET,SOCK_DGRAM,0);
+	if (fd < 0) return -1;
+	const int enable_broadcast = 1;
+	int result = setsockopt(fd,SOL_SOCKET,SO_BROADCAST,&enable_broadcast,sizeof(int));
+	if (result < 0){
+		close(fd);
+		return -1;
+	}
 	return fd;
 }
 
 //============ server use ============
 //------ low level ------
 int qd_send_response(int qdfd, const struct qd_response_packet *response, const struct sockaddr *address, socklen_t address_len){
-	//TODO
+	return sendto(qdfd,response,sizeof(*response),0,address,address_len);
 }
 int qd_recv_discover(int qdfd, struct qd_discover_packet *discover, struct sockaddr *address, socklen_t *address_len){
-	//TODO
+	return recvfrom(qdfd,discover,sizeof(*discover),0,address,address_len);
 }
 int qd_server_socket(){
-	//TODO
+	struct addrinfo *address_info, hints = {
+		.ai_socktype = SOCK_DGRAM,
+		.ai_family = AF_UNSPEC,
+		.ai_flags = AI_PASSIVE,
+	};
+	errno = ENOTSUP; //set incase gai error not an errno error
+	int result = getaddrinfo(NULL,QD_PORT_STRING,&hints,&address_info);
+	if (result < 0) return -1;
+	int fd = socket(address_info->ai_family,address_info->ai_socktype,0);
+	if (fd < 0){
+		freeaddrinfo(address_info);
+		return -1;
+	}
+	result = bind(fd,address_info->ai_addr,address_info->ai_addrlen);
+	freeaddrinfo(address_info);
+	if (result < 0){
+		close(fd);
+		return -1;
+	}
+	return fd;
 }
 //get address of the server
 static int _get_machine_address(struct sockaddr *addr, socklen_t *addrlen){
@@ -95,7 +133,7 @@ static void _qd_server_thread(void *_qd_server_thread_arg){
 	//==== listening loop ====
 	for (;;){
 		//listen for discover requests
-		struct qd_discover_packet discover_packet;
+		struct qd_discover_packet discover_packet = {0};
 		struct sockaddr sender_address = {0};
 		socklen_t sender_address_len = 0;
 		int result = qd_recv_discover(socket,&discover_packet,&sender_address,&sender_address_len);
