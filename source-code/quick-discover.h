@@ -92,6 +92,8 @@ client                             | |  / "desktop-d" has service TIME
 
 #define SERVICE_LEN 12
 #define HOSTNAME_MAX_LEN 254
+#define QD_PORT 15006
+#define QD_PORT_STRING "15006"
 //all fields are stored in network byte order (obviously)
 struct __attribute__((packed)) qd_discover_packet {
 	char hostname[HOSTNAME_MAX_LEN]; //not null terminated
@@ -106,5 +108,14 @@ struct __attribute__((packed)) qd_response_packet {
 	socklen_t address_len;
 };
 
+int qd_recv_response(int qdfd, struct qd_response_packet *response);
+int qd_send_discover(int qdfd, const struct qd_discover_packet *discover);
+int qd_client_socket();
+
+int qd_send_response(int qdfd, const struct qd_response_packet *response, const struct sockaddr *address, socklen_t address_len);
+int qd_recv_discover(int qdfd, struct qd_discover_packet *discover, struct sockaddr *address, socklen_t *address_len);
+int qd_server_socket();
+pthread_t start_qd_server(const char *service);
+void stop_qd_server(pthread_t server_thread);
 
 #endif
