@@ -3,6 +3,14 @@
 #include "quick-discover.h"
 #include <ifaddrs.h>
 #include <pthread.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <arpa/inet.h>
+#include <sys/socket.h>
+#include <errno.h>
+#include <string.h>
+#include <netdb.h>
+#include <stdio.h>
 
 struct _qd_server_thread_arg {
 	char service[SERVICE_LEN];
@@ -42,7 +50,7 @@ int qd_send_discover(int qdfd, const struct qd_discover_packet *discover){
 		},
 	};
 	socklen_t broadcast_addr_len = sizeof(struct sockaddr_in);
-	return sendto(qdfd,discover,sizeof(*discover),0,&broadcast_addr,broadcast_addr_len);
+	return sendto(qdfd,discover,sizeof(*discover),0,(struct sockaddr *)&broadcast_addr,broadcast_addr_len);
 }
 int qd_client_socket(){
 	int fd = socket(AF_INET,SOCK_DGRAM,0);
@@ -91,12 +99,12 @@ static int _get_machine_address(struct sockaddr *addr, socklen_t *addrlen){
 	struct ifaddrs *addrs;
 	int result = getifaddrs(&addrs);
 	if (result < 0) return -1;
-	for (;addrs != NULL; addrs = addrs.ifa_next){
+	for (;addrs != NULL; addrs = addrs->ifa_next){
 		int family = addrs->ifa_addr->sa_family;
 		if (family == AF_INET || family == AF_INET6){
-			socklen_t address_len = (family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6)
+			socklen_t address_len = (family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
 			*addrlen = address_len;
-			memcpy(addr,&addrs->ifa_addr,address_len);
+			memcpy(addr,addrs->ifa_addr,address_len);
 			freeifaddrs(addrs);
 			return 0;
 		}
@@ -105,7 +113,7 @@ static int _get_machine_address(struct sockaddr *addr, socklen_t *addrlen){
 	return -1;
 }
 //called by the server thread
-static void _qd_server_thread(void *_qd_server_thread_arg){
+static void *_qd_server_thread(void *_qd_server_thread_arg){
 	//==== setup ====
 	struct _qd_server_thread_arg *arg = _qd_server_thread_arg;
 	//extract the service
@@ -116,19 +124,19 @@ static void _qd_server_thread(void *_qd_server_thread_arg){
 	int result = gethostname(hostname,HOSTNAME_MAX_LEN);
 	if (result < 0){
 		arg->init_status = errno;
-		return;
+		return NULL;
 	}
 	uint8_t hostname_len = strlen(hostname);
 	//get a socket
 	FD_SCOPED socket = qd_server_socket();
 	if (socket < 0){
 		arg->init_status = errno;
-		return;
+		return NULL;
 	}
 	//signal setup was successful
-	pthread_mutex_lock(&arg->init_event_condition);
+	pthread_mutex_lock(&arg->init_event_mutex);
 	pthread_cond_broadcast(&arg->init_event_condition);
-	pthread_mutex_unlock(&arg->init_event_condition);
+	pthread_mutex_unlock(&arg->init_event_mutex);
 	arg->init_status = 0;
 	//==== listening loop ====
 	for (;;){
@@ -145,24 +153,24 @@ static void _qd_server_thread(void *_qd_server_thread_arg){
 		if (discover_packet.hostname_len != 0 ){
 			if (strncmp(hostname,discover_packet.hostname,discover_packet.hostname_len) != 0) continue;
 		}
-		if (disover_packet.service[0] != '\0'){
+		if (discover_packet.service[0] != '\0'){
 			if (strncmp(discover_packet.service,service,SERVICE_LEN) != 0) continue;
 		}
 		//get address
 		struct sockaddr_storage address = {0};
-		socklen_t address_len;
-		result = _get_machine_address(&address,&address_len);
+		socklen_t address_len = 0;
+		result = _get_machine_address((struct sockaddr *)&address,&address_len);
 		if (result != 0){
 			continue;
 		}
 		//reply
-		struct qd_response_packet response_packet = {0}
+		struct qd_response_packet response_packet = {0};
 		response_packet.hostname_len = hostname_len;
 		memcpy(&response_packet.hostname,hostname,hostname_len);
-		memcpy(&response_packet.address,address,address_len);
+		memcpy(&response_packet.address,&address,address_len);
 		response_packet.address_len = address_len;
-		memcpy(&response_packet.service,SERVICE_LEN);
-		result = qd_send_response(&response_packet,&sender_address,sender_address_len);
+		memcpy(&response_packet.service,service,SERVICE_LEN);
+		result = qd_send_response(socket,&response_packet,&sender_address,sender_address_len);
 		if (result != 0){
 			continue; //useless now but stops me forgetting if i change later
 		}
@@ -183,11 +191,12 @@ pthread_t start_qd_server(const char *service){
 	pthread_mutex_lock(&arg.init_event_mutex);
 	//create new thread
 	pthread_t thread;
-	int result = pthread_create(&thread,NULL,&_qd_server_thread,service_copy);
+	int result = pthread_create(&thread,NULL,&_qd_server_thread,&arg);
 	//wait untill thread has initialised
 	pthread_cond_wait(&arg.init_event_condition,&arg.init_event_mutex);
-	pthread_mutex_destroy(&arg.init_event_condition);
+	pthread_mutex_destroy(&arg.init_event_mutex);
 	//check initialisation status
+	if (result < 0) return -1;
 	if (arg.init_status > 0){
 		errno = arg.init_status;
 		return 0;
@@ -198,5 +207,5 @@ pthread_t start_qd_server(const char *service){
 }
 void stop_qd_server(pthread_t server_thread){
 	pthread_cancel(server_thread);
-	pthread_join(server_thread);
+	pthread_join(server_thread,NULL);
 }

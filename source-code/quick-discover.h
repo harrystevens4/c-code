@@ -1,6 +1,10 @@
 #ifndef _QD_H
 #define _QD_H
 
+#include <stdint.h>
+#include <pthread.h>
+#include <sys/socket.h>
+
 /*
 Here is the standard
 See all relevant structs and enums below
