@@ -12,11 +12,9 @@ void _close(void *arg){
 	close(fd);
 }
 
-void print_sockaddr(struct sockaddr *addr);
-
 int main(int argc, char **argv){
-	//====== prep discover request ======
-	struct qd_discover_packet discover_packet = {0};
+	char *hostname = NULL;
+	char *service = NULL;
 	//====== command line arguments ======
 	if (argc < 2){
 		fprintf(stderr,"Please use subcommand \"service\", \"hostname\" or \"all\"\n");
@@ -27,57 +25,44 @@ int main(int argc, char **argv){
 			fprintf(stderr,"Please provide a service name\n");
 			return 1;
 		}
-		strncpy(discover_packet.service,argv[2],QD_SERVICE_LEN);
+		service = argv[2];
 	}else if (strcmp("hostname",argv[1]) == 0){
 		if (argc < 3){
 			fprintf(stderr,"Please provide a hostname\n");
 			return 1;
 		}
-		strncpy(discover_packet.hostname,argv[2],HOSTNAME_MAX_LEN);
-		discover_packet.hostname_len = MIN(strlen(argv[2]),HOSTNAME_MAX_LEN);
+		hostname = argv[2];
+	}else if (strcmp("all",argv[1]) == 0){
+		;
 	}else {
 		fprintf(stderr,"Subcommand unrecognised\n");
 		return 1;
 	}
 	//====== make the request ======
-	__attribute__((__cleanup__(_close))) int qdfd = qd_client_socket();
-	if (qdfd < 0){
-		perror("qd_client_socket");
+	struct qd_response *response = qd_discover(service,hostname,250);
+	if (response == NULL){
+		perror("qd_discover");
 		return 1;
 	}
-	int result = qd_send_discover(qdfd,&discover_packet);
-	if (result < 0){
-		perror("qd_send_discover");
-		return 1;
+	//====== read responses ======
+	for (struct qd_response *current_response = response; current_response != NULL; current_response = current_response->next){
+		printf("got response:\n");
+		//address
+		char address_buffer[1024] = {0};
+		if (current_response->addr->sa_family){
+			struct sockaddr_in *in_addr = (struct sockaddr_in *)current_response->addr;
+			inet_ntop(AF_INET,&in_addr->sin_addr,address_buffer,1024);
+		}else {
+			struct sockaddr_in6 *in6_addr = (struct sockaddr_in6 *)current_response->addr;
+			inet_ntop(AF_INET6,&in6_addr->sin6_addr,address_buffer,1024);
+		}
+		printf("address: %s\n",address_buffer);
+		//hostname
+		printf("hostname: %s\n",current_response->hostname);
+		//service
+		printf("service: %.*s\n",QD_SERVICE_LEN,current_response->service);
 	}
-	struct qd_response_packet response_packet = {0};
-	result = qd_recv_response(qdfd,&response_packet);
-	if (result < 0){
-		perror("qd_recv_response");
-		return 1;
-	}
-	//====== read response ======
-	struct sockaddr_storage aligned_address = {0};
-	memcpy(&aligned_address,&response_packet.address,sizeof(struct sockaddr_storage));
-	printf("got response:\n");
-	printf("address: ");
-	print_sockaddr((struct sockaddr *)&aligned_address);
-	printf("\n");
 	//====== cleanup ======
+	qd_response_free(response);
 	return 0;
-}
-
-void print_sockaddr(struct sockaddr *addr){
-	char buffer[1024] = {0};
-	if (addr->sa_family == AF_INET){
-		struct sockaddr_in *addr = (struct sockaddr_in *)addr;
-		inet_ntop(AF_INET,&addr->sin_addr,buffer,1024);
-		printf("%s",buffer);
-	}else if (addr->sa_family == AF_INET6){
-		struct sockaddr_in6 *addr = (struct sockaddr_in6 *)addr;
-		inet_ntop(AF_INET6,&addr->sin6_addr,buffer,1024);
-		printf("%s",buffer);
-	}else {
-		printf("N/A");
-	}
 }
