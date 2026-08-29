@@ -121,8 +121,8 @@ struct qd_response {
 	char hostname[HOSTNAME_MAX_LEN+1]; //this IS a null terminated string
 	struct sockaddr *addr;
 	socklen_t addrlen;
-	struct qd_responses_ll *next;
-}
+	struct qd_response *next;
+};
 
 int qd_recv_response(int qdfd, struct qd_response_packet *response);
 int qd_send_discover(int qdfd, const struct qd_discover_packet *discover);

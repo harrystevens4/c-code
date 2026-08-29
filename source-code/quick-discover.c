@@ -71,7 +71,7 @@ int qd_client_socket(){
 static unsigned long _monotonic_time_ms(){
 	struct timespec result;
 	clock_gettime(CLOCK_MONOTONIC,&result);
-	return result.tv_sec*1000 + result.tv_nsec/1000000
+	return result.tv_sec*1000 + result.tv_nsec/1000000;
 }
 
 //------ high level ------
@@ -131,23 +131,26 @@ struct qd_response *qd_discover(const char *service, const char *hostname, int t
 		//====== read data into response ======
 		//allocate node
 		if (current_response == NULL){
-			responses =malloc(sizeof(struct qd_response)); 
+			responses = malloc(sizeof(struct qd_response)); 
 			current_response = responses;
 		}else{
 			current_response->next = malloc(sizeof(struct qd_response));
 			current_response = current_response->next;
 		}
+		memset(current_response,0,sizeof(struct qd_response));
 		//address
 		if (response_packet.is_ipv4){
 			current_response->addr = malloc(sizeof(struct sockaddr_in));
 			struct sockaddr_in *in_addr = (struct sockaddr_in *)current_response->addr;
 			in_addr->sin_addr = response_packet.address.inet;
 			current_response->addrlen = sizeof(struct sockaddr_in);
+			in_addr->sin_family = AF_INET;
 		}else {
-			struct sockaddr_in6 *in6_addr = malloc(sizoef(struct sockaddr_in6));
+			struct sockaddr_in6 *in6_addr = malloc(sizeof(struct sockaddr_in6));
 			current_response->addr = (struct sockaddr *)in6_addr;
 			current_response->addrlen = sizeof(struct sockaddr_in6);
-			memcpy(sin6_addr->sin6_addr,response_packet.address.inet6);
+			memcpy(&in6_addr->sin6_addr,&response_packet.address.inet6,sizeof(struct in6_addr));
+			in6_addr->sin6_family = AF_INET6;
 		}
 		//hostname
 		memset(current_response->hostname,0,sizeof(current_response->hostname));
@@ -162,6 +165,12 @@ struct qd_response *qd_discover(const char *service, const char *hostname, int t
 //TODO
 void qd_response_free(struct qd_response *response){
 	if (response == NULL) return;
+	for (struct qd_response *current = response; current != NULL;){
+		free(current->addr);
+		void *old_node = current; //I aint writing allat
+ 		current = current->next;
+		free(old_node);
+	}
 }
 
 //============ server use ============
