@@ -56,8 +56,8 @@ int qd_send_discover(int qdfd, const struct qd_discover_packet *discover){
 int qd_client_socket(){
 	int fd = socket(AF_INET,SOCK_DGRAM,0);
 	if (fd < 0) return -1;
-	const int enable_broadcast = 1;
-	int result = setsockopt(fd,SOL_SOCKET,SO_BROADCAST,&enable_broadcast,sizeof(int));
+	const int enable = 1;
+	int result = setsockopt(fd,SOL_SOCKET,SO_BROADCAST,&enable,sizeof(int));
 	if (result < 0){
 		close(fd);
 		return -1;
@@ -85,6 +85,17 @@ int qd_server_socket(){
 	int fd = socket(address_info->ai_family,address_info->ai_socktype,0);
 	if (fd < 0){
 		freeaddrinfo(address_info);
+		return -1;
+	}
+	const int enable = 1;
+	result = setsockopt(fd,SOL_SOCKET,SO_REUSEADDR,&enable,sizeof(int));
+	if (result < 0){
+		close(fd);
+		return -1;
+	}
+	result = setsockopt(fd,SOL_SOCKET,SO_REUSEPORT,&enable,sizeof(int));
+	if (result < 0){
+		close(fd);
 		return -1;
 	}
 	result = bind(fd,address_info->ai_addr,address_info->ai_addrlen);
