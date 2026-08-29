@@ -13,7 +13,7 @@
 #include <stdio.h>
 
 struct _qd_server_thread_arg {
-	char service[SERVICE_LEN];
+	char service[QD_SERVICE_LEN];
 	pthread_mutex_t init_event_mutex;
 	pthread_cond_t init_event_condition;
 	int init_status;
@@ -43,7 +43,7 @@ int qd_recv_response(int qdfd, struct qd_response_packet *response){
 int qd_send_discover(int qdfd, const struct qd_discover_packet *discover){
 	//im just gonna put the ipv4 in the bag because i cba rn with ipv6
 	const struct sockaddr_in broadcast_addr = {
-		.sin_family = htons(AF_INET),
+		.sin_family = AF_INET,
 		.sin_port = htons(QD_PORT),
 		.sin_addr = {
 			.s_addr = 0xffffffff,
@@ -99,12 +99,12 @@ static int _get_machine_address(struct sockaddr *addr, socklen_t *addrlen){
 	struct ifaddrs *addrs;
 	int result = getifaddrs(&addrs);
 	if (result < 0) return -1;
-	for (;addrs != NULL; addrs = addrs->ifa_next){
-		int family = addrs->ifa_addr->sa_family;
+	for (struct ifaddrs *current_addr = addrs; current_addr != NULL; current_addr = current_addr->ifa_next){
+		int family = current_addr->ifa_addr->sa_family;
 		if (family == AF_INET || family == AF_INET6){
 			socklen_t address_len = (family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
 			*addrlen = address_len;
-			memcpy(addr,addrs->ifa_addr,address_len);
+			memcpy(addr,current_addr->ifa_addr,address_len);
 			freeifaddrs(addrs);
 			return 0;
 		}
@@ -117,8 +117,8 @@ static void *_qd_server_thread(void *_qd_server_thread_arg){
 	//==== setup ====
 	struct _qd_server_thread_arg *arg = _qd_server_thread_arg;
 	//extract the service
-	char service[SERVICE_LEN] = {0};
-	memcpy(service,&arg->service,SERVICE_LEN);
+	char service[QD_SERVICE_LEN] = {0};
+	memcpy(service,&arg->service,QD_SERVICE_LEN);
 	//grab hostname
 	char hostname[HOSTNAME_MAX_LEN+1] = {0};
 	int result = gethostname(hostname,HOSTNAME_MAX_LEN);
@@ -142,9 +142,9 @@ static void *_qd_server_thread(void *_qd_server_thread_arg){
 	for (;;){
 		//listen for discover requests
 		struct qd_discover_packet discover_packet = {0};
-		struct sockaddr sender_address = {0};
-		socklen_t sender_address_len = 0;
-		int result = qd_recv_discover(socket,&discover_packet,&sender_address,&sender_address_len);
+		struct sockaddr_storage sender_address = {0};
+		socklen_t sender_address_len = sizeof(sender_address);
+		int result = qd_recv_discover(socket,&discover_packet,(struct sockaddr *)&sender_address,&sender_address_len);
 		if (result < 0){
 			perror("qd_recv_discover");
 			continue;
@@ -154,7 +154,7 @@ static void *_qd_server_thread(void *_qd_server_thread_arg){
 			if (strncmp(hostname,discover_packet.hostname,discover_packet.hostname_len) != 0) continue;
 		}
 		if (discover_packet.service[0] != '\0'){
-			if (strncmp(discover_packet.service,service,SERVICE_LEN) != 0) continue;
+			if (strncmp(discover_packet.service,service,QD_SERVICE_LEN) != 0) continue;
 		}
 		//get address
 		struct sockaddr_storage address = {0};
@@ -169,8 +169,8 @@ static void *_qd_server_thread(void *_qd_server_thread_arg){
 		memcpy(&response_packet.hostname,hostname,hostname_len);
 		memcpy(&response_packet.address,&address,address_len);
 		response_packet.address_len = address_len;
-		memcpy(&response_packet.service,service,SERVICE_LEN);
-		result = qd_send_response(socket,&response_packet,&sender_address,sender_address_len);
+		memcpy(&response_packet.service,service,QD_SERVICE_LEN);
+		result = qd_send_response(socket,&response_packet,(struct sockaddr *)&sender_address,sender_address_len);
 		if (result != 0){
 			continue; //useless now but stops me forgetting if i change later
 		}
@@ -184,7 +184,7 @@ pthread_t start_qd_server(const char *service){
 		.init_event_mutex = PTHREAD_MUTEX_INITIALIZER,
 		.init_event_condition = PTHREAD_COND_INITIALIZER,
 	};
-	memcpy(&arg.service,service,SERVICE_LEN);
+	memcpy(&arg.service,service,QD_SERVICE_LEN);
 	/*by locking this here the thread cant signal it is done before we start waiting
 	for it as it has to wait for the mutex to unlock which happens atomicaly
 	when pthread_cond_wait it called*/

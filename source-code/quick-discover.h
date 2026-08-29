@@ -94,7 +94,7 @@ client                             | |  / "desktop-d" has service TIME
 
 */
 
-#define SERVICE_LEN 12
+#define QD_SERVICE_LEN 12
 #define HOSTNAME_MAX_LEN 254
 #define QD_PORT 15006
 #define QD_PORT_STRING "15006"
@@ -102,12 +102,12 @@ client                             | |  / "desktop-d" has service TIME
 struct __attribute__((packed)) qd_discover_packet {
 	char hostname[HOSTNAME_MAX_LEN]; //not null terminated
 	uint8_t hostname_len;
-	char service[SERVICE_LEN]; //not null terminated but the rest of the buffer should be '\0'
+	char service[QD_SERVICE_LEN]; //not null terminated but the rest of the buffer should be '\0'
 };
 struct __attribute__((packed)) qd_response_packet {
 	char hostname[HOSTNAME_MAX_LEN];
 	uint8_t hostname_len;
-	char service[SERVICE_LEN]; //small string to identify what service is being offered
+	char service[QD_SERVICE_LEN]; //small string to identify what service is being offered
 	struct sockaddr_storage address;
 	socklen_t address_len;
 };
