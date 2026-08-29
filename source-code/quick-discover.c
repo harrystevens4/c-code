@@ -12,6 +12,7 @@
 #include <netdb.h>
 #include <stdio.h>
 #include <net/if.h>
+#include <poll.h>
 
 struct _qd_server_thread_arg {
 	char service[QD_SERVICE_LEN];
@@ -26,6 +27,8 @@ static void _close_shim(void *arg){
 	if (fd < 0) return;
 	close(fd);
 }
+
+#define MIN(a,b) ((a) < (b) ? (a) : (b))
 #define FD_SCOPED \
 	__attribute__((__cleanup__(_close_shim))) int
 
@@ -63,6 +66,102 @@ int qd_client_socket(){
 		return -1;
 	}
 	return fd;
+}
+
+static unsigned long _monotonic_time_ms(){
+	struct timespec result;
+	clock_gettime(CLOCK_MONOTONIC,&result);
+	return result.tv_sec*1000 + result.tv_nsec/1000000
+}
+
+//------ high level ------
+//service and hostname can both be NULL
+//service is also a regular string here it will be truncated if needed for you
+//hostname is also a regular string
+//use qd_response_free() when you are done
+struct qd_response *qd_discover(const char *service, const char *hostname, int timeout_ms){
+	//====== prep discover request ======
+	struct qd_discover_packet discover_packet = {0};
+	if (service != NULL){
+		strncpy(discover_packet.service,service,QD_SERVICE_LEN);
+	}
+	if (hostname != NULL){
+		//discover_packet.service is HOSTNAME_MAX_LEN+1 so it will always have a
+		//null byte chilling at the end
+		strncpy(discover_packet.hostname,hostname,HOSTNAME_MAX_LEN);
+		discover_packet.hostname_len = MIN(strlen(hostname),HOSTNAME_MAX_LEN);
+	}
+	//====== setup socket ======
+	FD_SCOPED qdfd = qd_client_socket();
+	if (qdfd < 0) return NULL;
+	//====== send discover request ======
+	int result = qd_send_discover(qdfd,&discover_packet);
+	if (result < 0){
+		return NULL;
+	}
+	//===== receiving loop ======
+	struct qd_response *responses = NULL;
+	struct qd_response *current_response = NULL;
+	for (;;){
+		//====== check stuff is available ======
+		struct pollfd poll_fds[1] = {{
+			.fd = qdfd,
+			.events = POLLIN,
+		}};
+		long poll_start_time = _monotonic_time_ms();
+		int result = poll(poll_fds,1,timeout_ms);
+		if (result < 0){
+			//error
+			qd_response_free(responses);
+			return NULL;
+		}
+		if (result == 0){
+			//no fd available (timeout exipred)
+			break;
+		}
+		//fd available
+		timeout_ms -= _monotonic_time_ms() - poll_start_time;
+		//====== receive a response ======
+		struct qd_response_packet response_packet = {0};
+		result = qd_recv_response(qdfd,&response_packet);
+		if (result < 0){
+			qd_response_free(responses);
+			return NULL;
+		}
+		//====== read data into response ======
+		//allocate node
+		if (current_response == NULL){
+			responses =malloc(sizeof(struct qd_response)); 
+			current_response = responses;
+		}else{
+			current_response->next = malloc(sizeof(struct qd_response));
+			current_response = current_response->next;
+		}
+		//address
+		if (response_packet.is_ipv4){
+			current_response->addr = malloc(sizeof(struct sockaddr_in));
+			struct sockaddr_in *in_addr = (struct sockaddr_in *)current_response->addr;
+			in_addr->sin_addr = response_packet.address.inet;
+			current_response->addrlen = sizeof(struct sockaddr_in);
+		}else {
+			struct sockaddr_in6 *in6_addr = malloc(sizoef(struct sockaddr_in6));
+			current_response->addr = (struct sockaddr *)in6_addr;
+			current_response->addrlen = sizeof(struct sockaddr_in6);
+			memcpy(sin6_addr->sin6_addr,response_packet.address.inet6);
+		}
+		//hostname
+		memset(current_response->hostname,0,sizeof(current_response->hostname));
+		strncpy(current_response->hostname,response_packet.hostname,MIN(response_packet.hostname_len,HOSTNAME_MAX_LEN));
+		//service
+		strncpy(current_response->service,response_packet.service,QD_SERVICE_LEN);
+	}
+	//====== cleanup ======
+	return responses;
+}
+
+//TODO
+void qd_response_free(struct qd_response *response){
+	if (response == NULL) return;
 }
 
 //============ server use ============

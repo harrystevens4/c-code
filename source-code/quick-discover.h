@@ -116,9 +116,19 @@ struct __attribute__((packed)) qd_response_packet {
 	uint8_t is_ipv4; //1 for ipv4 0 for ipv6
 };
 
+struct qd_response {
+	char service[QD_SERVICE_LEN];
+	char hostname[HOSTNAME_MAX_LEN+1]; //this IS a null terminated string
+	struct sockaddr *addr;
+	socklen_t addrlen;
+	struct qd_responses_ll *next;
+}
+
 int qd_recv_response(int qdfd, struct qd_response_packet *response);
 int qd_send_discover(int qdfd, const struct qd_discover_packet *discover);
 int qd_client_socket();
+struct qd_response *qd_discover(const char *service, const char *hostname, int timeout_ms);
+void qd_response_free(struct qd_response *response);
 
 int qd_send_response(int qdfd, const struct qd_response_packet *response, const struct sockaddr *address, socklen_t address_len);
 int qd_recv_discover(int qdfd, struct qd_discover_packet *discover, struct sockaddr *address, socklen_t *address_len);
