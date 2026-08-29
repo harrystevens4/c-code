@@ -8,6 +8,7 @@
 #include <string.h>
 #include "../../../source-code/base_n.h"
 #include "../../../source-code/crypto.h"
+#include "../../../source-code/quick-discover.h"
 #include <alloca.h>
 
 #define PORT 19532
@@ -17,6 +18,7 @@
 enum action {
 	ACTION_UNLOCK = 0,
 	ACTION_LOCK,
+	ACTION_SHUTDOWN,
 };
 
 struct __attribute__((packed)) auth_request {
@@ -59,17 +61,18 @@ int main(int argc, char **argv){
 	const struct option long_options[] = {
 		{"unlock-command",required_argument,0,'u'},
 		{"lock-command",required_argument,0,'l'},
+		{"shutdown-command",required_argument,0,'s'},
 		{"secret-key",required_argument,0,'k'},
 		{"help",no_argument,0,'h'},
 		{0,0,0,0}
 	};
-	char commands[2][1024] = {0};
+	char commands[3][1024] = {0};
 	char *secret_key = NULL;
 	ssize_t secret_key_len = 0;
 	//====== digest command line ======
 	for (;;){
 		int option_index = 0;
-		int result = getopt_long(argc,argv,"u:l:k:h",long_options,&option_index);
+		int result = getopt_long(argc,argv,"u:l:k:hs:",long_options,&option_index);
 		if (result == -1) break;
 		switch (result){
 		case 'u':
@@ -77,6 +80,9 @@ int main(int argc, char **argv){
 			break;
 		case 'l':
 			strncpy(commands[ACTION_LOCK],optarg,sizeof(commands[ACTION_LOCK])-1);
+			break;
+		case 's':
+			strncpy(commands[ACTION_SHUTDOWN],optarg,sizeof(commands[ACTION_LOCK])-1);
 			break;
 		case 'k':
 			secret_key = alloca((strlen(optarg)*6)/8);
@@ -93,6 +99,12 @@ int main(int argc, char **argv){
 	}
 	if (secret_key == NULL){
 		fprintf(stderr,"Please provide a secret key (see --help for help)\n");
+		return EXIT_FAILURE;
+	}
+	//====== start the quick discover server ======
+	pthread_t qd_server = start_qd_server("UNLOCKFPHONE");
+	if (qd_server == 0){
+		perror("start_qd_server");
 		return EXIT_FAILURE;
 	}
 	//====== setup network ======
@@ -190,6 +202,7 @@ int main(int argc, char **argv){
 			system(commands[requested_action]);
 		}else {
 			action_status = 1;
+			if (requested_action >= sizeof(commands)/sizeof(commands[0])) action_status = 2;
 		}
 		//====== request_status ======
 		struct request_status status = {
@@ -206,16 +219,18 @@ int main(int argc, char **argv){
 		close(connection);
 		printf("connection closed\n");
 	}
+	stop_qd_server(qd_server);
 	return 0;
 }
 
 void print_help(){
 	printf("usage: remoteunlockd [options]\n");
 	printf("options:\n");
-	printf("	-h, --help                 : show this help text\n");
-	printf("	-k, --secret-key <key>     : provide the base64 secret key to use\n");
-	printf("	-u, --unlock-command <cmd> : run this command when unlock is requested\n");
-	printf("	-l, --lock-command <cmd>   : run this command when lock is requested\n");
+	printf("	-h, --help                     : show this help text\n");
+	printf("	-k, --secret-key <key>         : provide the base64 secret key to use\n");
+	printf("	-u, --unlock-command <cmd>     : run this command when unlock is requested\n");
+	printf("	-l, --lock-command <cmd>       : run this command when lock is requested\n");
+	printf("	-s, --shutdown-command <cmd>   : run this command when shutdown is requested\n");
 	printf("instructions:\n");
 	printf("pick a random secret key to use for both the mobile app and daemon.\n");
 	printf("when the mobile app requests an action, if the secret keys match, it will run the relevant command.\n");
