@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <pthread.h>
 #include <sys/socket.h>
+#include <netinet/in.h>
 
 /*
 Here is the standard
@@ -108,8 +109,11 @@ struct __attribute__((packed)) qd_response_packet {
 	char hostname[HOSTNAME_MAX_LEN];
 	uint8_t hostname_len;
 	char service[QD_SERVICE_LEN]; //small string to identify what service is being offered
-	struct sockaddr_storage address;
-	socklen_t address_len;
+	union {
+		struct in_addr inet;
+		struct in6_addr inet6;
+	} address;
+	uint8_t is_ipv4; //1 for ipv4 0 for ipv6
 };
 
 int qd_recv_response(int qdfd, struct qd_response_packet *response);

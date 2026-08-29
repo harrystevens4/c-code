@@ -11,6 +11,7 @@
 #include <string.h>
 #include <netdb.h>
 #include <stdio.h>
+#include <net/if.h>
 
 struct _qd_server_thread_arg {
 	char service[QD_SERVICE_LEN];
@@ -101,6 +102,7 @@ static int _get_machine_address(struct sockaddr *addr, socklen_t *addrlen){
 	if (result < 0) return -1;
 	for (struct ifaddrs *current_addr = addrs; current_addr != NULL; current_addr = current_addr->ifa_next){
 		int family = current_addr->ifa_addr->sa_family;
+		if (current_addr->ifa_flags & IFF_LOOPBACK) continue;
 		if (family == AF_INET || family == AF_INET6){
 			socklen_t address_len = (family == AF_INET) ? sizeof(struct sockaddr_in) : sizeof(struct sockaddr_in6);
 			*addrlen = address_len;
@@ -167,8 +169,15 @@ static void *_qd_server_thread(void *_qd_server_thread_arg){
 		struct qd_response_packet response_packet = {0};
 		response_packet.hostname_len = hostname_len;
 		memcpy(&response_packet.hostname,hostname,hostname_len);
-		memcpy(&response_packet.address,&address,address_len);
-		response_packet.address_len = address_len;
+		//fill in the address
+		if (address.ss_family == AF_INET){
+			struct sockaddr_in *in_addr = (struct sockaddr_in *)&address;
+			memcpy(&response_packet.address.inet,&in_addr->sin_addr,sizeof(struct in_addr));
+		}else if (address.ss_family == AF_INET6){
+			struct sockaddr_in6 *in6_addr = (struct sockaddr_in6 *)&address;
+			memcpy(&response_packet.address.inet6,&in6_addr->sin6_addr,sizeof(struct in6_addr));
+		}
+		response_packet.is_ipv4 = (address.ss_family == AF_INET) ? 1 : 0;
 		memcpy(&response_packet.service,service,QD_SERVICE_LEN);
 		result = qd_send_response(socket,&response_packet,(struct sockaddr *)&sender_address,sender_address_len);
 		if (result != 0){
