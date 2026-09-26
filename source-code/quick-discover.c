@@ -188,7 +188,7 @@ int qd_server_socket(){
 		.ai_flags = AI_PASSIVE,
 	};
 	errno = ENOTSUP; //set incase gai error not an errno error
-	int result = getaddrinfo(NULL,QD_PORT_STRING,&hints,&address_info);
+	int result = getaddrinfo("0.0.0.0",QD_PORT_STRING,&hints,&address_info);
 	if (result < 0) return -1;
 	int fd = socket(address_info->ai_family,address_info->ai_socktype,0);
 	if (fd < 0){
