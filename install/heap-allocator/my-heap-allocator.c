@@ -99,7 +99,11 @@ int extend_heap(void *chunk_start, size_t target_chunk_size){
 void init(){
 	//====== initialise structures ======
 	memset(&heap_info,0,sizeof(heap_info));
-	pthread_mutex_init(&heap_info.heap_lock,NULL);
+	pthread_mutexattr_t mutex_attr;
+	pthread_mutexattr_init(&mutex_attr);
+	pthread_mutexattr_settype(&mutex_attr,PTHREAD_MUTEX_RECURSIVE);
+	pthread_mutex_init(&heap_info.heap_lock,&mutex_attr);
+	pthread_mutexattr_destroy(&mutex_attr);
 	//====== mmap a small heap to start with ======
 	void *heap_start = mmap(NULL,INITIAL_HEAP_SIZE,PROT_READ | PROT_WRITE,MAP_PRIVATE | MAP_ANONYMOUS,-1,0);
 	heap_info.heap_start = heap_start;
@@ -168,27 +172,32 @@ void *mha_realloc(void *ptr, size_t new_size){
 	if (!initialised) init();
 	if (!initialised) return NULL; //initialisation failed
 	if (ptr == NULL) return mha_alloc(new_size);
-	//TODO needs locking
+	//lock in
+	pthread_mutex_lock(&heap_info.heap_lock);
 	//====== check chunk ======
 	struct chunk_header *chunk = ptr - sizeof(struct chunk_header);
 	size_t old_size = chunk->chunk_size;
 	//its not realy plausable to move the next chunk back to take up the space so simply ignore the request
 	if (new_size <= old_size) return ptr; 
 	//====== is there enough free space to resize in place? ======
+	char *result = NULL;
 	if (chunk->next != NULL && chunk->next->chunk_size >= new_size - old_size){
-		if (merge_chunk_with_next(chunk) < 0) return NULL;
+		if (merge_chunk_with_next(chunk) < 0) goto end;
 		//will fail if there isnt enough space for the header but
 		//its ok if we just have a slightly larger chunk
 		split_chunk(chunk,new_size);
-		return ptr;
+		result = ptr;
 	}else {
 		//====== alloc a new chunk and move the data there ======
 		void *new_allocation = mha_alloc(new_size);
-		if (new_allocation == NULL) return NULL;
+		if (new_allocation == NULL) goto end;
 		memcpy(new_allocation,ptr,chunk->chunk_size);
 		free(ptr);
-		return new_allocation;
+		result = new_allocation;
 	}
+	end:
+	pthread_mutex_unlock(&heap_info.heap_lock);
+	return result;
 }
 
 void print_heap_state(){
