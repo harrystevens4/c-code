@@ -8,6 +8,11 @@
 
 //whenever I refer to chunk_start as a parameter, it is a pointer to chunk_header, not the first byte of the usable chunk
 
+//TODO mutex isnt actually doing anything
+//TODO checksum half used
+//TODO abort on error is cooked
+//TODO align all chunks to 8 bytes
+
 #define INITIAL_HEAP_SIZE 1024
 
 struct chunk_header {
@@ -59,8 +64,8 @@ int merge_chunk_with_next(void *chunk_start){
 	if (chunk_start == NULL) return -1;
 	struct chunk_header *this_chunk = chunk_start;
 	struct chunk_header *next_chunk = this_chunk->next;
-	//both chunks must be free to merge
-	if (!this_chunk->is_free || next_chunk == NULL || !next_chunk->is_free) return -1;
+	//next chunk must be free to merge
+	if (next_chunk == NULL || !next_chunk->is_free) return -1;
 	//nothing to merge too
 	if (this_chunk->next == NULL) return 0;
 	//merge
@@ -73,6 +78,7 @@ int merge_chunk_with_next(void *chunk_start){
 }
 
 int extend_heap(void *chunk_start, size_t target_chunk_size){
+	//TODO not fully implemented?
 	struct chunk_header *chunk;
 	void *allocation_start = chunk_start+sizeof(struct chunk_header)+chunk->chunk_size;
 	void *allocation = mmap(
@@ -87,6 +93,7 @@ int extend_heap(void *chunk_start, size_t target_chunk_size){
 	if (allocation != allocation_start){
 		return -1;
 	}
+	return 0;
 }
 
 void init(){
@@ -158,8 +165,10 @@ void mha_free(void *ptr){
 }
 
 void *mha_realloc(void *ptr, size_t new_size){
-	//TODO
+	if (!initialised) init();
+	if (!initialised) return NULL; //initialisation failed
 	if (ptr == NULL) return mha_alloc(new_size);
+	//TODO needs locking
 	//====== check chunk ======
 	struct chunk_header *chunk = ptr - sizeof(struct chunk_header);
 	size_t old_size = chunk->chunk_size;
@@ -167,11 +176,18 @@ void *mha_realloc(void *ptr, size_t new_size){
 	if (new_size <= old_size) return ptr; 
 	//====== is there enough free space to resize in place? ======
 	if (chunk->next != NULL && chunk->next->chunk_size >= new_size - old_size){
-		//TODO
-		merge_chunk_with_next(chunk);
+		if (merge_chunk_with_next(chunk) < 0) return NULL;
+		//will fail if there isnt enough space for the header but
+		//its ok if we just have a slightly larger chunk
+		split_chunk(chunk,new_size);
+		return ptr;
 	}else {
 		//====== alloc a new chunk and move the data there ======
-		//TODO
+		void *new_allocation = mha_alloc(new_size);
+		if (new_allocation == NULL) return NULL;
+		memcpy(new_allocation,ptr,chunk->chunk_size);
+		free(ptr);
+		return new_allocation;
 	}
 }
 
